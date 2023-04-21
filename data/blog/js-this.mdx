@@ -1,0 +1,511 @@
+---
+title: 一文彻底搞懂 Javascript 的 this（含 ES6+）
+date: '2020-04-05'
+tags: ['Javascript']
+draft: false
+summary: 关于 Javascript 的 this 相信大家已经阅读过一些关于它的文章，也在实践中有些知识积累，作为 JavaScript 中最令人困惑的机制之一，即便是一些老练的开发也不一定完全掌握 this 这个神奇的东西，今天我结合 ES6+ 的一些语法重新梳理下 this，希望对大家有所帮助
+---
+
+![beach](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/big_this.jpeg?x-oss-process=image/resize,w_600,limit_0)
+
+## 前言
+关于 Javascript 的 this 相信大家已经阅读过一些关于它的文章，也在实践中有些知识积累，作为 JavaScript 中最令人困惑的机制之一，即便是一些老练的开发也不一定完全掌握 this 这个神奇的东西，今天我结合 ES6+ 的一些语法重新梳理下 this，希望对大家有所帮助。
+
+## this的定义
+ECMAScript 规范（5.1）中是这样描述 this 的：
+
+>The this keyword evaluates to the value of the ThisBinding of the current execution context.
+
+意思是当前执行上下文的 ThisBinding 的值就是 this。
+this 是一个对象，与执行的上下文环境息息相关，也可以把 this 称为上下文对象，激活执行上下文的上下文。
+## 执行上下文
+### 什么是执行上下文？
+简而言之，执行上下文是评估和执行 JavaScript 代码的环境的抽象概念。每当 Javascript 代码在运行的时候，它都是在执行上下文中运行。
+
+执行上下文有 3 种：全局执行上下文、函数执行上下文和 eval 执行上下文。
+### 全局执行上下文的 this
+**1. 浏览器：**
+```js
+console.log(this);
+// window
+```
+**2. Node：**
+```js
+console.log(this)
+// global
+```
+
+**总结**：在全局作用域中它的 this 执行当前的全局对象（浏览器端是 `Window`，node 中是 `global`）。
+
+**知识补充**：
+
+在`Web`中，可以通过 window、self 或者 frames 取到全局对象，但是在`Web Workers`中，只有 self 可以。在`Node.js`中，它们都无法获取，必须使用 global。
+
+在松散模式下，可以在函数中返回 this 来获取全局对象，但是在严格模式和模块环境下，this 会返回 undefined。
+
+`globalThis`旨在通过定义一个标准的全局属性来整合日益分散的访问全局对象的方法。该提案目前处于第四阶段，这意味着它已经准备好被纳入 ES2020 标准。所有流行的浏览器，包括 Chrome 71+、Firefox 65+ 和 Safari 12.1+，都已经支持这项功能。你也可以在 Node.js 12+ 中使用它。
+### 函数执行上下文的 this
+函数执行上下文的 this 有些复杂，主要是因为它不是静态绑定到一个函数的，而是与函数如何被调用有关，也就是说即使是同一个函数，每次执行时的 this 也有可能不一样。
+
+在 JavaScript 中，this 是指当前函数中正在执行的上下文环境。JavaScript 中共有4种函数**调用方式**：
+* 函数调用方式；``` alert('Hello World!') ```
+* 方法调用方式；``` console.log('Hello World!') ```
+* 构造函数方式；``` new RegExp('\\d') ```
+* 间接调用方式（apply/call）；``` alert.call(undefined, 'Hello World') ```
+
+在以上每一项调用中，它都拥有各自独立的上下文环境，就会造成 this 所指意义有所差别。此外，严格模式也会对执行环境造成影响。
+
+**以下例子均在浏览器环境**
+
+**1. 函数调用**
+
+1.1 函数调用中的 this
+
+当一个函数并非一个对象的属性时，那么它就是被当做一个函数来调用的。此时，相当于在全局上下文环境中调用此函数，this 指向全局对象 。
+```js
+var funA = function() {
+  return this.value;
+}
+console.log(funA()); //undefined
+var value = 233;
+console.log(funA()); //233
+```
+1.2 严格模式下的函数调用
+
+使用严格模式，只需要将 'use strict' 置于函数体的顶部。这样上下文环境中的 this 将为 undefined。
+```js
+function strictFun() {  
+    'use strict';
+    console.log(this === undefined); // => true
+}
+```
+**易错**：对象方法中的内部方法中的 this：
+```js
+var numbers = {  
+    numberA: 5,
+    numberB: 10,
+    sum: function() {
+        console.log(this === numbers); // => true
+        function calculate() {
+            console.log(this === numbers); // => false
+            // this 是 window，而不是numbers
+            // 严格模式下， this 是 undefined
+            return this.numberA + this.numberB;
+        }
+        return calculate();
+    }    
+};    
+numbers.sum(); // NaN ；严格模式下throws TypeError
+```
+**2.方法调用**
+
+2.1 方法调用中的 this
+当在一个对象里调用方法时，this 指的是对象自身。
+```js
+var obj = {
+  value:233,
+  funA:function(){
+    return this.value;//通过obj.funA()调用时，this指向obj
+  }
+}
+console.log(obj.funA());//233
+```
+obj.funA() 调用意味着上下文执行环境在 obj 对象里。
+
+我们还可以这么写：
+```js
+function funA() {
+  console.log(this.value);
+}
+var obj = {
+  value: 233,
+  foo: funA
+}
+obj.funA();// 233
+```
+
+**易错**：当把对象的方法赋值给一个变量后执行
+```js
+var obj = {
+  value:233,
+  funA:function(){
+    return this.value;//通过funB()调用时，this指向全局对象
+  }
+}
+var value = 1;
+var funB = obj.funA;
+funB(); // 1
+```
+上例方法在执行的时候，是被当作一个普通函数来直接调用，因此，this 指向全局对象。
+
+**易错**：回调里的 this
+```js
+var obj = {
+  funA: function() {
+    console.log(this);
+  },
+  funB: function() {
+    console.log(this);
+    setTimeout(this.funA, 1000);
+  }
+}
+obj.funB(); 
+// obj
+// window
+```
+上例 funA 执行时的 this 指向全局对象，原因是当 funB 执行时，this.funA 作为一个 setTimeout 方法的一个参数传入（fun = this.funA）,当执行时只是 fun() 执行，此时的执行上下文已与 obj 对象无关。
+
+**易错**：setTimeout 下的严格模式
+
+```js
+'use strict';
+function foo() {
+  console.log(this); // window
+}
+setTimeout(foo, 1);
+```
+上例 foo 方法中的 this 指向全局对象，大家有可能会有些奇怪，不是说好的严格模式下方法中的 this 是 undefined 吗？这里却是全局对象，难道是严格模式失效了吗？
+
+[MDN 关于 SetTimeout 的文档](https://developer.mozilla.org/zh-CN/docs/Web/API/Window/setTimeout)中有个标注：
+
+>即使是在严格模式下，setTimeout() 的回调函数里面的 this 仍然默认指向 window 对象，并不是 undefined。此特性也同样适用于 setInterval。
+
+**3.构造函数调用**
+
+构造函数调用时，this 指向了这个构造函数调用时候实例化出来的对象；
+```js
+function Person(name) {
+  this.name = name;
+  console.log(this);
+}
+var p = new Person('Eason');
+// Person {name: "Eason"}
+```
+在使用 class 语法时也是同样的情况（在 ES6 中），初始化只发生在它的 constructor 方法中。
+```js
+class Person {
+  constructor(name){
+    this.name = name;
+    console.log(this)
+  }
+}
+var p = new Person('Eason');
+// Person {name: "Eason"}
+```
+当执行 new Person() 时，JavaScript 创建了一个空对象并且它的上下文环境为 constructor 方法。
+
+**4.间接调用**
+
+当一个函数使用了 .call() 或者 .apply() 方法时则为间接调用。
+
+在间接调用中，this 指向的是 .call() 和 .apply()传递的第一个参数
+
+* call
+```js
+fun.call(thisArg[, arg1[, arg2[, ...]]])
+```
+* apply
+```js
+fun.apply(thisArg[, [arg1, arg2, ...]])
+```
+当函数执行需要特别指定上下文时，间接调用非常有用，它可以解决函数调用中的上下文问题（this 指向 window 或者严格模式下指向 undefined），同时也可以用来模拟方法调用对象。
+```js
+var eason = { name: 'Eason' };  
+function concatName(str) {  
+  console.log(this === eason); // => true
+  return `${str} ${this.name}`;
+}
+concatName.call(eason, 'Hello ');  // => 'Hello Eason'  
+concatName.apply(eason, ['Bye ']); // => 'Bye Eason' 
+```
+另一个实践例子为，在 ES5 中的类继承中，调用父级构造器。
+```js
+function Animal(name) {  
+  console.log(this instanceof Cat); // => true
+  this.name = name;  
+}
+function Cat(name, color) {  
+  console.log(this instanceof Cat); // => true
+  // 间接调用，调用了父级构造器
+  Animal.call(this, name);
+  this.color = color;
+}
+var tom = new Cat('Tom', 'orange');  
+tom; // { name: 'Tom', color: 'orange' }
+```
+Animal.call(this, name) 在 Cat 里间接调用了父级方法初始化对象。
+
+>需要注意的是如果这个函数处于非严格模式下，则第一个参数不传入或指定为 null 或 undefined 时会自动替换为指向全局对象。
+
+**5.绑定函数调用**
+
+.bind() 方法的作用是创建一个新的函数，执行时的上下文环境为 .bind(thisArg) 传递的第一个参数，它允许创建预先设置好 this 的函数。
+
+```js
+fun.bind(thisArg[, arg1[, arg2[, ...]]])
+```
+
+>thisArg
+
+调用绑定函数时作为 this 参数传递给目标函数的值。 
+
+如果使用new运算符构造绑定函数，提供的 this 值会被忽略，但前置参数仍会提供给模拟函数。
+
+>arg1, arg2, ...
+
+当目标函数被调用时，被预置入绑定函数的参数列表中的参数。
+
+对比方法 .apply() 和 .call()，它俩都立即执行了函数，而 .bind() 函数返回了一个新方法，绑定了预先指定好的 this ，并可以延后调用。
+```js
+var students = {  
+  arr: ['Eason', 'Jay', 'Mayday'],
+  getStudents: function() {
+    return this.arr;    
+  }
+};
+// 创建一个绑定函数
+var boundGetStudents = students.getStudents.bind(students);  
+boundGetStudents(); // => ['Eason', 'Jay', 'Mayday'] 
+```
+
+>.bind() 创建了一个永久的上下文环境并不可修改。绑定函数即使使用 .call() 或者 .apply()重新传入其他不同的上下文环境，也不会更改它之前绑定的上下文环境，不会起任何作用。只有在构造器调用时，绑定函数可以改变上下文。
+
+```js
+function getThis() {
+  'use strict';
+  return this;
+}
+var one = getThis.bind(1);  
+// 绑定函数调用
+one(); // => 1  
+// 使用 .apply() 和 .call() 绑定函数
+one.call(2);  // => 1  
+one.apply(2); // => 1  
+// 重新绑定
+one.bind(2)(); // => 1  
+// 利用构造器方式调用绑定函数
+new one(); // => Object  
+// ES6提供了一种新的实例化方式
+Reflect.construct(one,[]);   // => Object
+```
+**总结**：this 绑定的优先级
+
+「new 绑定(构造函数)」 > 「显式绑定（bind）」 > 「隐式绑定（方法调用）」 > 「默认绑定（函数调用）」
+
+**6.箭头函数中的 this**
+
+函数体内的 this 对象，就是定义时所在的对象，而不是使用时所在的对象。
+```js
+function foo() {
+  setTimeout(() => {
+    console.log('id:', this.id);
+  }, 100);
+}
+var id = 21;
+foo.call({ id: 42 }); // id: 42
+```
+箭头函数可以让 this 指向固定化，这种特性很有利于封装回调函数。
+
+>this 指向的固定化，并不是因为箭头函数内部有绑定 this 的机制，实际原因是箭头函数根本没有自己的 this，导致内部的 this 就是外层代码块的 this 。正是因为它没有 this，所以也就不能用作构造函数。
+
+另外，由于箭头函数没有自己的this，所以当然也就不能用 call()、apply()、bind() 这些方法去改变 this 的指向。
+
+**易错**：对象方法定义
+```js
+const cat = {
+  lives: 9,
+  jumps: () => {
+    this.lives--; // 此 this 指向全局对象
+  }
+}
+```
+因为对象不构成单独的作用域，导致 jumps 箭头函数定义时的作用域就是全局作用域。
+
+**易错**：事件回调的动态 this
+```js
+var button = document.getElementById('press');
+button.addEventListener('click', () => {
+  this.classList.toggle('on');
+});
+```
+上面代码运行时，点击按钮会报错，因为 button 的监听函数是一个箭头函数，导致里面的 this就是全局对象。如果改成普通函数，this 就会动态指向被点击的按钮对象。
+### eval 执行上下文
+**1.直接调用**
+
+this 指向调用 eval 的那个运行上下文。
+```js
+eval("console.log(this);"); // window
+var obj = {
+  method: function () {
+    eval('console.log(this === obj)'); // true
+  }
+}
+obj.method(); 
+```
+**2.间接调用**
+
+不管在哪调用，则其运行上下文都是复制全局运行上下文，所以 this 都是全局对象。
+```js
+var evalcopy = eval;
+evalcopy("console.log(this);"); // window
+var obj = {
+  method: function () {
+    evalcopy('console.log(this)'); //window
+  }
+}
+obj.method();
+```
+
+## 什么是this？
+this 不是编写时绑定，而是运行时绑定。它依赖于函数调用的上下文条件。this 绑定和函数声明的位置无关，而和函数被调用的方式有关。
+
+当一个函数被调用时，会建立一个活动记录，也称为执行环境。这个记录包含函数是从何处（call-stack）被调用的，函数是 如何 被调用的，被传递了什么参数等信息。this 就是这个记录的一个属性，会在函数执行的过程中用到。
+
+## 补充
+零散的知识碎片：
+
+### 还有些Api也支持绑定this：
+```
+Array.prototype.every( callbackfn [ , thisArg ] )
+Array.prototype.some( callbackfn [ , thisArg ] )
+Array.prototype.forEach( callbackfn [ , thisArg ] )
+Array.prototype.map( callbackfn [ , thisArg ] )
+Array.prototype.filter( callbackfn [ , thisArg ] )
+```
+* Array.from() 用于将两类对象转为真正的数组：类似数组的对象（array-like object）和可遍历（iterable）的对象。它的第二个参数类似 map 方法，用来对每个元素进行处理，将处理后的值放入返回的数组。它的第三个参数可以绑定 map 方法中的 this。
+
+* 数组实例的 find() 和 findIndex() 支持第二个参数用以绑定第一个函数参数里的 this。
+
+* flatMap() 方法对原数组的每个成员执行一个函数（相当于执行 Array.prototype.map()），然后对返回值组成的数组执行 flat() 方法。该方法返回一个新数组，不改变原数组。flatMap() 方法还可以有第二个参数，用来绑定遍历函数里面的this。
+
+### Reflect 中的 this
+* Reflect.apply 方法等同于 Function.prototype.apply.call(func, thisArg, args)，用于绑定 this 对象后执行给定函数。
+一般来说，如果要绑定一个函数的 this 对象，可以这样写 fn.apply(obj, args)，但是如果函数定义了自己的 apply 方法，就只能写成 Function.prototype.apply.call(fn, obj, args)，采用 Reflect 对象可以简化这种操作。
+
+* Reflect.get(target, name, receiver) 和 Reflect.set(target, name, value, receiver)，如果 name 属性部署了读取/赋值函数（getter/setter），则读取函数的 this 绑定 receiver。
+```js
+var myObject = {
+  foo: 1,
+  bar: 2,
+  get baz() {
+    return this.foo + this.bar;
+  },
+};
+var myReceiverObject = {
+  foo: 4,
+  bar: 4,
+};
+Reflect.get(myObject, 'baz', myReceiverObject) // 8
+```
+### Proxy
+* apply方法可以接受三个参数，分别是目标对象、目标对象的上下文对象（this）和目标对象的参数数组。
+```js
+var handler = {
+  apply (target, ctx, args) {
+    return Reflect.apply(...arguments);
+  }
+};
+```
+* Proxy 的 this 问题
+
+Proxy 代理的情况下，目标对象内部的 this 关键字会指向 Proxy 代理。
+```js
+const target = {
+  m: function () {
+    console.log(this === proxy);
+  }
+};
+const handler = {};
+const proxy = new Proxy(target, handler);
+target.m() // false
+proxy.m()  // true
+```
+上面代码中，一旦 proxy 代理 target.m，后者内部的 this 就是指向 proxy，而不是 target。
+### ES6 外部的模块脚本中的 this
+* 模块之中，顶层的 this 关键字返回 undefined，而不是指向 window。也就是说，在模块顶层使用 this 关键字，是无意义的。利用顶层的 this 等于 undefined 这个语法点，可以侦测当前代码是否在 ES6 模块之中。
+```js
+<script type="module" src="./foo.js"></script>
+```
+* ES6 模块应该是通用的，同一个模块不用修改，就可以用在浏览器环境和服务器环境。为了达到这个目标，Node 规定 ES6 模块之中不能使用 CommonJS 模块的特有的一些内部变量。
+首先，就是this关键字。ES6 模块之中，顶层的 this 指向 undefined；CommonJS 模块的顶层 this 指向当前模块，这是两者的一个重大差异。
+### super 关键字
+ES6 又新增了一个关键字 super，指向当前对象的原型对象。super 关键字表示原型对象时，只能用在对象的方法之中，用在其他地方都会报错。目前，只有对象方法的简写法可以让 JavaScript 引擎确认，定义的是对象的方法。
+```js
+const proto = {
+  x: 'hello',
+  foo() {
+    console.log(this.x);
+  },
+};
+const obj = {
+  x: 'world',
+  foo() {
+    super.foo();
+  }
+}
+Object.setPrototypeOf(obj, proto);
+obj.foo() // "world"
+```
+上面代码中，super.foo 指向原型对象 proto 的 foo 方法，但是绑定的 this 却还是当前对象 obj，因此输出的就是 world。
+### Class 中的 this
+* 一个类必须有 constructor 方法，如果没有显式定义，一个空的 constructor 方法会被默认添加。constructor 方法默认返回实例对象（即 this ），完全可以指定返回另外一个对象。
+* 与 ES5 一样，实例的属性除非显式定义在其本身（即定义在 this 对象上），否则都是定义在原型上。
+* 类的方法内部如果含有 this ，它默认指向类的实例。如果将这个方法提取出来单独使用，this 会指向该方法运行时所在的环境（由于 class 内部是严格模式，所以 this 实际指向的是 undefined ）
+* 静态方法包含 this 关键字，这个 this 指的是类，而不是实例。
+* 类的继承：
+
+1. 子类必须在 constructor 方法中调用 super 方法，否则新建实例时会报错。这是因为子类自己的 this 对象，必须先通过父类的构造函数完成塑造，得到与父类同样的实例属性和方法，然后再对其进行加工，加上子类自己的实例属性和方法。如果不调用 super 方法，子类就得不到 this 对象。
+
+2. ES5 的继承，实质是先创造子类的实例对象 this ，然后再将父类的方法添加到 this 上面（Parent.apply(this)）。ES6 的继承机制完全不同，实质是先将父类实例对象的属性和方法，加到 this 上面（所以必须先调用 super 方法），然后再用子类的构造函数修改 this 。
+
+3. 在子类的构造函数中，只有调用 super 之后，才可以使用 this 关键字，否则会报错。这是因为子类实例的构建，基于父类实例，只有 super 方法才能调用父类实例。
+4. ES6 规定，在子类普通方法中通过super调用父类的方法时，方法内部的this指向当前的子类实例。由于this指向子类实例，所以如果通过super对某个属性赋值，这时super就是this，赋值的属性会变成子类实例的属性。
+```js
+class A {
+  constructor() {
+    this.x = 1;
+  }
+}
+class B extends A {
+  constructor() {
+    super();
+    this.x = 2;
+    super.x = 3;
+    console.log(super.x); // undefined
+    console.log(this.x); // 3
+  }
+}
+let b = new B();
+```
+上面代码中，super.x赋值为3，这时等同于对this.x赋值为3。而当读取super.x的时候，读的是A.prototype.x，所以返回undefined。
+
+5. 在子类的静态方法中通过super调用父类的方法时，方法内部的this指向当前的子类，而不是子类的实例。
+```js
+class A {
+  constructor() {
+    this.x = 1;
+  }
+  static print() {
+    console.log(this.x);
+  }
+}
+class B extends A {
+  constructor() {
+    super();
+    this.x = 2;
+  }
+  static m() {
+    super.print();
+  }
+}
+B.x = 3;
+B.m() // 3
+```
+
+## 结语
+文中若有错误或者补充，还请不吝赐教。
+## 参考文献
+* [MDN](https://developer.mozilla.org/zh-CN/)
+
+* [ES6-阮一峰](https://es6.ruanyifeng.com/)
+
