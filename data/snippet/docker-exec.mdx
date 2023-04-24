@@ -1,0 +1,47 @@
+---
+title: '修改运行中的Docker容器的代码'
+heading: '修改容器代码'
+summary: 'docker exec命令可以进入容器，进行一些比如执行命令，修改代码、安装包、查看日志等的操作'
+date: '2023-4-23'
+draft: false
+tags: ['docker']
+devType: 'Docker'
+---
+
+import Twemoji from './components/Twemoji.tsx'
+
+docker exec 是 Docker 命令的一部分，用于在运行中的 Docker 容器中执行命令。使用 docker exec 可以进入容器内部的 Shell 环境，也可以运行单个命令。
+
+使用 docker exec 的好处包括：
+
+在容器中执行命令，比如查看容器日志、安装软件包等。
+可以在容器启动时不需要附加交互式的 shell。
+允许多次进入同一个容器内部，避免创建多个相同容器的冗余。
+允许在容器外部执行命令，从而更好地管理容器和应用程序。
+
+今天我们主要介绍如何修改 Web 项目的代码，例如我的影音系统 Jellyfin 提供给了一些朋友观看，我想查看该网站的访问情况，就需要接入 SDK。我使用的开源自建的 Umami 就可以实现这个功能。
+
+为了实现这个功能，需要将下面的一段代码添加到需要分析的网站上。只要能修改 Jellyfin 返回的 HTML 内容，就可以实现了。
+
+![](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-img/snippet-docker-exec-umami.png)
+
+Jellyfin 是部署在NAS 的 Docker 里的，通过Jellyfin镜像的 Dockerfile 文件可以找到它的 Web 项目路径是在 /jellyfin/jellyfin-web 目录下。接下来就可以进入容器修改。
+
+```bash
+# 找到 Jellyfin 的容器 ID
+docker container ls | grep jellyfin
+
+# 进入容器
+docker exec -it <容器ID> /bin/bash
+
+# 使用 sed 命令修改 index.html
+cd /jellyfin/jellyfin-web/
+sed -i 's#<body>#<body><script async src="https://q.210313.cn:21132/script.js" data-website-id="d85e5cb3-48b7-470d-bb4f-b561bbd23ce0"></script>#g' index.html
+
+# 退出容器
+exit
+```
+
+好了，现在查看 Umami 控制台，可以看到已经生效了！<Twemoji emoji='smiling-face-with-sunglasses'/>
+
+![snippet-docker-exec-umami-jellyfin](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-img/snippet-docker-exec-umami-jellyfin.png)

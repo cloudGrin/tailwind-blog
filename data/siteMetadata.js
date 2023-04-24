@@ -5,6 +5,7 @@ const siteMetadata = {
   title: "Grin's Blog",
   author: 'WenHan Wang',
   headerTitle: "Grin's Blog",
+  footerTitle: "Grin's Blog",
   description: 'A blog created with Next.js and Tailwind.css',
   language: 'zh-cn',
   theme: 'system', // system, dark or light
