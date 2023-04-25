@@ -8,7 +8,13 @@ const mutation = gql`
   }
 `
 
-export function ViewCounter({ path, className }: { path: Blog['path']; className: string }) {
+export default function ViewCounter({
+  path,
+  className,
+}: {
+  path: Blog['path']
+  className: string
+}) {
   const [result, executeMutation] = useMutation(mutation)
 
   const views = Number(result.data?.views)

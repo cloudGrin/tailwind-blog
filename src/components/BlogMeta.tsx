@@ -1,5 +1,5 @@
-import { Twemoji } from './Twemoji'
-import { ViewCounter } from './ViewCounter'
+import Twemoji from './Twemoji'
+import ViewCounter from './ViewCounter'
 import { type Blog } from 'contentlayer/generated'
 import { formatDate } from 'pliny/utils/formatDate'
 

@@ -1,0 +1,170 @@
+---
+title: 给博客文章加入阅读人次统计
+date: '2023-04-25'
+tags: ['GraphQL', 'TailwindBlog','Javascript']
+draft: false
+summary: 使用GraphQL、urql、Apollo-server4、Prisma 和 PostgreSQL在TailwindBlog中加入阅读人次统计
+---
+
+![graphql-urql-prisma](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-img/graphql-urql-prisma.png?x-oss-process=image/resize,w_600,limit_0)
+
+在本篇文章中，我将介绍如何使用 graphql、urql、Apollo-server4、prisma 和 postgresql 在TailwindBlog中加入阅读人次统计的功能。
+
+## 使用 prisma 创建数据库模型
+
+首先，我们要使用 prisma 创建我们的数据库模型。由于文章是markdown存储在git中，只需要定义一个Views模型统计文章标题和访问数量就可以了。
+
+```bash
+# 初始化prisma
+pnpm prisma init
+```
+
+```typescript
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+}
+
+model BlogPostViews {
+  id        Int     @id @default(autoincrement())
+  postName  String  @unique
+  views     Int     @default(0)
+}
+```
+
+## 使用 Apollo Server 构建 GraphQL 服务端
+
+接下来，我们将使用 Apollo-server 构建一个 GraphQL 服务端。我们将把 prisma 接入到 resolvers 中，这样我们就可以通过 GraphQL API 来查询数据库了。
+
+Apollo-server实例在nextjs提供的pages/api中初始化。
+
+```typescript
+// src/pages/api/graphql.ts
+import { ApolloServer } from '@apollo/server'
+import { startServerAndCreateNextHandler } from '@as-integrations/next'
+import { prisma } from '@/server/db'
+
+const typeDefs = `#graphql
+  type Query {
+    addViewCount(postName: String!): BlogPostViews!
+  }
+
+  type Mutation {
+    views(postName: String!): Int!
+  }
+
+  type BlogPostViews {
+    postName: String!
+    views: Int!
+  }
+`
+
+const resolvers = {
+  Query: {
+    async addViewCount(parent, { postName }) {
+      const result = await prisma.blogPostViews.findUnique({
+        where: { postName },
+      })
+
+      if (!result) {
+        throw new Error(`Blog post with name "${postName}" not found`)
+      }
+
+      return result
+    },
+  },
+
+  Mutation: {
+    async views(parent, { postName }) {
+      const blogPostViews = await prisma.blogPostViews.findUnique({
+        where: { postName },
+      })
+
+      let views = 1
+      if (blogPostViews) {
+        views = blogPostViews.views + 1
+        await prisma.blogPostViews.update({
+          where: { id: blogPostViews.id },
+          data: { views: views },
+        })
+      } else {
+        await prisma.blogPostViews.create({ data: { postName: postName, views: views } })
+      }
+
+      return views
+    },
+  },
+
+  BlogPostViews: {
+    async postName(blogPostViews) {
+      return blogPostViews.postName
+    },
+
+    async views(blogPostViews) {
+      return blogPostViews.views
+    },
+  },
+}
+
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+})
+
+export default startServerAndCreateNextHandler(server)
+```
+## urql接入nextjs页面
+
+urql 具有很好的可扩展性，并且可以轻松地集成到 React 应用程序中。
+
+- 简单易用的 API
+- 支持 SSR（服务端渲染）和 SSG（静态网站生成）
+- 支持缓存和数据的预取
+
+```typescript
+// src/pages/_app.tsx
+import { Provider as UrqlProvider } from 'urql'
+import { Client, cacheExchange, fetchExchange } from 'urql'
+
+const urqlClient = new Client({
+  url: '/api/graphql',
+  exchanges: [cacheExchange, fetchExchange],
+})
+
+export default function App() {
+  return <UrqlProvider value={urqlClient}>text</UrqlProvider>
+}
+
+```
+
+```typescript
+// src/components/viewCounter.tsx
+import { useEffect } from 'react'
+import { gql, useMutation } from 'urql'
+
+const mutation = gql`
+  mutation Mutation($postName: String!) {
+    views(postName: $postName)
+  }
+`
+
+export default function ViewCounter({ path, className }: { path: string; className: string }) {
+  const [result, executeMutation] = useMutation(mutation)
+
+  const views = Number(result.data?.views)
+
+  useEffect(() => {
+    executeMutation({ postName: path })
+  }, [executeMutation, path])
+
+  return <span className={className}>{`${views > 0 ? views.toLocaleString() : '–––'} views`}</span>
+}
+```
+好了查看一下页面，已经生效了
+
+![graphql-urql-prisma-counter](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-img/graphql-urql-prisma-counter.png)

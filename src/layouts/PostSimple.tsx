@@ -19,7 +19,7 @@ interface LayoutProps {
   children: ReactNode
 }
 
-const editUrl = (path) => `${siteMetadata.siteRepo}/blob/master/data/${path}`
+const editUrl = (path) => `${siteMetadata.siteRepo}/blob/master/src/data/${path}`
 
 export default function PostSimple({ content, authorDetails, children }: LayoutProps) {
   const [loadComments, setLoadComments] = useState(true)
