@@ -1,0 +1,17 @@
+import siteMetadata from '@/data/siteMetadata'
+import { BuiltWith } from './BuiltWith'
+
+export default function Footer() {
+  return (
+    <footer>
+      <div className="items-center justify-between mt-4 mb-8 space-y-4 md:mt-10 md:mb-16 md:flex md:space-y-0">
+        <BuiltWith />
+        <div className="flex my-2 space-x-2 text-sm text-gray-500 dark:text-gray-400">
+          <div>{`Copyright © ${new Date().getFullYear()}`}</div>
+          <span>{` • `}</span>
+          <span>{siteMetadata.footerTitle}</span>
+        </div>
+      </div>
+    </footer>
+  )
+}

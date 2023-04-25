@@ -119,10 +119,10 @@ export const Snippet = defineDocumentType(() => ({
 }))
 
 export default makeSource({
-  contentDirPath: 'data',
+  contentDirPath: 'src/data',
   documentTypes: [Authors, Blog, Snippet],
   mdx: {
-    cwd: process.cwd(),
+    cwd: path.join(root, 'src/components'),
     remarkPlugins: [
       remarkExtractFrontmatter,
       remarkGfm,
@@ -134,7 +134,7 @@ export default makeSource({
       rehypeSlug,
       rehypeAutolinkHeadings,
       rehypeKatex,
-      [rehypeCitation, { path: path.join(root, 'data') }],
+      [rehypeCitation, { path: path.join(root, 'src/data') }],
       [rehypePrismPlus, { ignoreMissing: true }],
       rehypePresetMinify,
     ],

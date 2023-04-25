@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "incremental": true,
-    "target": "ES6",
+    "target": "es2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -17,12 +17,7 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/components/*": ["components/*"],
-      "@/data/*": ["data/*"],
-      "@/layouts/*": ["layouts/*"],
-      "@/lib/*": ["lib/*"],
-      "@/css/*": ["css/*"],
-      "@/utils/*": ["utils/*"],
+      "@/*": ["./src/*"],
       "contentlayer/generated": [".contentlayer/generated"]
     },
     "plugins": [
@@ -34,6 +29,7 @@
   "include": [
     "next-env.d.ts",
     "**/*.js",
+    "**/*.mjs",
     "**/*.ts",
     "**/*.tsx",
     ".contentlayer/generated",
