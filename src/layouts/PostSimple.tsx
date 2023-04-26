@@ -31,7 +31,7 @@ export default function PostSimple({ content, authorDetails, children }: LayoutP
       <ScrollTopAndComment />
       <article>
         <div>
-          <header className="py-6 xl:pb-16 xl:pt-16">
+          <header className="py-5 xl:pb-11 xl:pt-11">
             <div className="space-y-4">
               <BlogTags tags={tags} />
               <PageTitle>{title}</PageTitle>

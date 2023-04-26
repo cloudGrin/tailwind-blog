@@ -1,0 +1,34 @@
+---
+title: '使用Docker网络进行容器通信'
+heading: '使用Docker网络进行容器通信'
+summary: '在Nas的docker里构建一个数据库容器，供其他多个容器去消费'
+date: '2023-4-23'
+draft: false
+tags: ['Docker']
+devType: 'Docker'
+---
+
+- 创建一个新的 Docker 网络：`docker network create my-network`
+
+- 启动第一个容器并将其连接到创建的网络：`docker run --name container1 --network my-network image1`
+
+- 启动第二个容器，并将其连接到相同的网络：`docker run --name container2 --network my-network image2`
+
+- 在容器中使用容器名称或 IP 地址进行通信：`ping container1`
+
+
+例如我在Nas的docker里构建一个数据库容器，供其他多个容器去消费
+
+```bash
+docker run -d \
+ --name postgres15 \
+ --network pgNetwork \
+ -e POSTGRES_PASSWORD=password \
+ -e POSTGRES_USER=admin \
+ -e POSTGRES_DB=database \
+ -v /volume1/docker/postgres:/var/lib/postgresql/data \
+ -p 15532:5432 \
+ postgres:15
+```
+
+其他容器可以通过 postgres15:5432 访问到数据库
