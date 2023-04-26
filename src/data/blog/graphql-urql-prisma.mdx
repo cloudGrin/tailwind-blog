@@ -1,26 +1,27 @@
 ---
-title: 给博客文章加入阅读人次统计
+title: 使用 Urql、Apollo-server4、Prisma 实现端到端类型安全
 date: '2023-04-25'
-tags: ['GraphQL', 'TailwindBlog','Javascript']
+tags: ['GraphQL', 'Typescript']
 draft: false
-summary: 使用GraphQL、urql、Apollo-server4、Prisma 和 PostgreSQL在TailwindBlog中加入阅读人次统计
+summary: 在nextjs项目中通过制作一个博客访问人次的小功能说明使用 Urql、Apollo-server4、Prisma 实现数据库到后端再到前端的类型安全的全流程
 ---
 
 ![graphql-urql-prisma](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-img/graphql-urql-prisma.png?x-oss-process=image/resize,w_600,limit_0)
 
-在本篇文章中，我将介绍如何使用 graphql、urql、Apollo-server4、prisma 和 postgresql 在TailwindBlog中加入阅读人次统计的功能。
+在本篇文章中，我将通过制作一个博客访问人次的小功能说明使用 Urql、Apollo-server4、Prisma 实现数据库到后端再到前端的类型安全的全流程
 
 ## 使用 prisma 创建数据库模型
 
-首先，我们要使用 prisma 创建我们的数据库模型。由于文章是markdown存储在git中，只需要定义一个Views模型统计文章标题和访问数量就可以了。
+首先，我们要使用 prisma 创建我们的数据库模型。由于文章是 markdown 存储在 git 中，只需要定义一个 Views 模型统计文章标题和访问数量就可以了。
 
 ```bash
 # 初始化prisma
 pnpm prisma init
 ```
 
-```typescript
-// prisma/schema.prisma
+配置 prisma
+
+```
 generator client {
   provider = "prisma-client-js"
 }
@@ -37,34 +38,93 @@ model BlogPostViews {
 }
 ```
 
+```bash
+pnpm prisma generate
+```
+
+在 package.json 中添加 script
+
+```json
+"scripts": {
+    "postinstall": "prisma generate",
+}
+```
+
+## 添加 schema.graphql
+
+由于需要生成类型且需要在 nextjs 的服务端里读取，所以单独将 graphql 的 schema 文件放在 public 目录下，如果有更好的方式也可以留言告诉我，谢谢。
+
+```graphql
+type Query {
+  addViewCount(postName: String!): BlogPostViews!
+}
+
+type Mutation {
+  views(postName: String!): Int!
+}
+
+type BlogPostViews {
+  postName: String!
+  views: Int!
+}
+```
+
+## graphql 前后端类型生成
+
+配置 codegen.ts 文件，执行 codegen 命令，在 src/gql 下生成 ts 类型
+
+```typescript
+// codegen.ts
+
+import type { CodegenConfig } from '@graphql-codegen/cli'
+
+const config: CodegenConfig = {
+  schema: 'public/schema.graphql',
+  documents: ['src/**/*.tsx'],
+  ignoreNoDocuments: true, // for better experience with the watcher
+  generates: {
+    './src/gql/': {
+      preset: 'client',
+      plugins: [],
+    },
+    './src/gql/resolvers-types.ts': {
+      plugins: ['typescript', 'typescript-resolvers'],
+      config: {
+        useIndexSignature: true,
+      },
+    },
+  },
+}
+
+export default config
+```
+
+```bash
+pnpm graphql-codegen --config codegen.ts
+```
+
 ## 使用 Apollo Server 构建 GraphQL 服务端
 
 接下来，我们将使用 Apollo-server 构建一个 GraphQL 服务端。我们将把 prisma 接入到 resolvers 中，这样我们就可以通过 GraphQL API 来查询数据库了。
 
-Apollo-server实例在nextjs提供的pages/api中初始化。
+Apollo-server 实例在 nextjs 提供的 pages/api 中初始化。
+
+数据库到服务端的类型由 Prisma 来保证。
+
+通过传入刚刚生成的类型 Resolvers，可以对编写的 resolvers 进行类型约束，使其满足我们 graphql 的 schema 的要求。
 
 ```typescript
 // src/pages/api/graphql.ts
 import { ApolloServer } from '@apollo/server'
 import { startServerAndCreateNextHandler } from '@as-integrations/next'
 import { prisma } from '@/server/db'
+import { Resolvers } from '@/gql/resolvers-types'
 
-const typeDefs = `#graphql
-  type Query {
-    addViewCount(postName: String!): BlogPostViews!
-  }
+const typeDefs = readFileSync(join(process.cwd(), 'public', 'schema.graphql'), {
+  encoding: 'utf-8',
+})
 
-  type Mutation {
-    views(postName: String!): Int!
-  }
-
-  type BlogPostViews {
-    postName: String!
-    views: Int!
-  }
-`
-
-const resolvers = {
+const resolvers: Resolvers = {
   Query: {
     async addViewCount(parent, { postName }) {
       const result = await prisma.blogPostViews.findUnique({
@@ -118,13 +178,16 @@ const server = new ApolloServer({
 
 export default startServerAndCreateNextHandler(server)
 ```
-## urql接入nextjs页面
+
+## urql 接入 nextjs 页面
 
 urql 具有很好的可扩展性，并且可以轻松地集成到 React 应用程序中。
 
 - 简单易用的 API
 - 支持 SSR（服务端渲染）和 SSG（静态网站生成）
 - 支持缓存和数据的预取
+
+实例化 Urql：
 
 ```typescript
 // src/pages/_app.tsx
@@ -139,19 +202,21 @@ const urqlClient = new Client({
 export default function App() {
   return <UrqlProvider value={urqlClient}>text</UrqlProvider>
 }
-
 ```
+
+通过导入我们在 src/gql 下生成的 graphql 函数，传入模板字符串，就可以确保 useMutation 有类型支持
 
 ```typescript
 // src/components/viewCounter.tsx
 import { useEffect } from 'react'
-import { gql, useMutation } from 'urql'
+import { useMutation } from 'urql'
+import { graphql } from '@/gql'
 
-const mutation = gql`
+const mutation = graphql(`
   mutation Mutation($postName: String!) {
     views(postName: $postName)
   }
-`
+`)
 
 export default function ViewCounter({ path, className }: { path: string; className: string }) {
   const [result, executeMutation] = useMutation(mutation)
@@ -165,6 +230,9 @@ export default function ViewCounter({ path, className }: { path: string; classNa
   return <span className={className}>{`${views > 0 ? views.toLocaleString() : '–––'} views`}</span>
 }
 ```
-好了查看一下页面，已经生效了
 
-![graphql-urql-prisma-counter](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-img/graphql-urql-prisma-counter.png)
+## 结语
+
+以上介绍了在 graphql 下实现端到端类型安全的具体实现，可以在我的博客项目里查看代码。
+
+如果你并未使用 graphql，并且也想在同构项目中实现端到端类型安全，可以使用 [trpc](https://trpc.io/)
