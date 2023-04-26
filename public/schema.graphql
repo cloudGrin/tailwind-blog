@@ -1,0 +1,12 @@
+type Query {
+  addViewCount(postName: String!): BlogPostViews!
+}
+
+type Mutation {
+  views(postName: String!): Int!
+}
+
+type BlogPostViews {
+  postName: String!
+  views: Int!
+}

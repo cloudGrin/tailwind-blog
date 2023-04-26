@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
-import { gql, useMutation } from 'urql'
+import { useMutation } from 'urql'
 import { type Blog } from 'contentlayer/generated'
+import { graphql } from '@/gql'
 
-const mutation = gql`
+const mutation = graphql(`
   mutation Mutation($postName: String!) {
     views(postName: $postName)
   }
-`
+`)
 
 export default function ViewCounter({
   path,

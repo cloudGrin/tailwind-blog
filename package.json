@@ -5,11 +5,12 @@
   "scripts": {
     "postinstall": "prisma generate",
     "start": "next dev",
-    "dev": "cross-env INIT_CWD=$PWD next dev",
-    "build": "cross-env INIT_CWD=$PWD next build && cross-env NODE_OPTIONS='--experimental-json-modules' node -r esbuild-register ./scripts/postbuild.mjs",
+    "dev": "npm run codegen && cross-env INIT_CWD=$PWD next dev",
+    "build": "npm run codegen && cross-env INIT_CWD=$PWD next build && cross-env NODE_OPTIONS='--experimental-json-modules' node -r esbuild-register ./scripts/postbuild.mjs",
     "serve": "next start",
     "analyze": "cross-env ANALYZE=true next build",
-    "lint": "next lint --fix --dir pages --dir components --dir lib --dir layouts --dir scripts"
+    "lint": "next lint --fix --dir pages --dir components --dir lib --dir layouts --dir scripts",
+    "codegen": "graphql-codegen --config codegen.ts"
   },
   "dependencies": {
     "@apollo/server": "^4.7.0",
@@ -43,16 +44,21 @@
     "remark": "^14.0.2",
     "remark-gfm": "^3.0.1",
     "remark-math": "^5.1.1",
-    "tailwindcss": "^3.3.1",
+    "tailwindcss": "^3.3.2",
     "unist-util-visit": "^4.1.2",
-    "urql": "^4.0.0",
+    "urql": "^4.0.1",
     "zod": "^3.21.4"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "3.3.1",
+    "@graphql-codegen/client-preset": "3.0.1",
+    "@graphql-codegen/typescript": "^3.0.4",
+    "@graphql-codegen/typescript-resolvers": "^3.2.1",
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@svgr/webpack": "^7.0.0",
-    "@types/react": "^18.0.38",
-    "@typescript-eslint/eslint-plugin": "^5.59.0",
-    "@typescript-eslint/parser": "^5.59.0",
+    "@types/react": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.1",
+    "@typescript-eslint/parser": "^5.59.1",
     "cross-env": "^7.0.3",
     "dedent": "^0.7.0",
     "esbuild-register": "3.4.2",
