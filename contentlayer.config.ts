@@ -118,9 +118,30 @@ export const Snippet = defineDocumentType(() => ({
   computedFields,
 }))
 
+export const Syndication = defineDocumentType(() => ({
+  name: 'Syndication',
+  filePathPattern: 'syndication/**/*.mdx',
+  contentType: 'mdx',
+  fields: {
+    title: { type: 'string', required: true },
+    date: { type: 'date', required: true },
+    tags: { type: 'list', of: { type: 'string' } },
+    lastmod: { type: 'date' },
+    draft: { type: 'boolean' },
+    summary: { type: 'string' },
+    images: { type: 'list', of: { type: 'string' } },
+    authors: { type: 'list', of: { type: 'string' } },
+    layout: { type: 'string' },
+    bibliography: { type: 'string' },
+    canonicalUrl: { type: 'string' },
+    isEdit: { type: 'boolean' },
+  },
+  computedFields,
+}))
+
 export default makeSource({
   contentDirPath: 'src/data',
-  documentTypes: [Authors, Blog, Snippet],
+  documentTypes: [Authors, Blog, Snippet, Syndication],
   mdx: {
     cwd: path.join(root, 'src/components'),
     remarkPlugins: [

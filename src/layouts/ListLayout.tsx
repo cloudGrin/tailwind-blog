@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { formatDate } from 'pliny/utils/formatDate'
 import { CoreContent } from 'pliny/utils/contentlayer'
-import type { Blog } from 'contentlayer/generated'
+import type { Blog, Syndication, Snippet } from 'contentlayer/generated'
 import Link from '@/components/Link'
 import Tag from '@/components/Tag'
 import siteMetadata from '@/data/siteMetadata'
@@ -12,10 +12,11 @@ interface PaginationProps {
   currentPage: number
 }
 interface ListLayoutProps {
-  posts: CoreContent<Blog>[]
+  posts: CoreContent<Blog | Syndication | Snippet>[]
   title: string
-  initialDisplayPosts?: CoreContent<Blog>[]
+  initialDisplayPosts?: CoreContent<Blog | Syndication | Snippet>[]
   pagination?: PaginationProps
+  titleTips?: string
 }
 
 function Pagination({ totalPages, currentPage }: PaginationProps) {
@@ -63,7 +64,9 @@ export default function ListLayout({
   title,
   initialDisplayPosts = [],
   pagination,
+  titleTips,
 }: ListLayoutProps) {
+  const router = useRouter()
   const [searchValue, setSearchValue] = useState('')
   const filteredBlogPosts = posts.filter((post) => {
     const searchContent = post.title + post.summary + post.tags.join(' ')
@@ -81,6 +84,11 @@ export default function ListLayout({
           <h1 className="text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl sm:leading-10 md:text-6xl md:leading-14">
             {title}
           </h1>
+          {titleTips && (
+            <h5 className="text-lg tracking-tight text-gray-600 dark:text-gray-200 sm:text-xl md:text-2xl">
+              {titleTips}
+            </h5>
+          )}
           <div className="relative max-w-lg">
             <label>
               <span className="sr-only">Search articles</span>
@@ -111,7 +119,7 @@ export default function ListLayout({
         <ul>
           {!filteredBlogPosts.length && 'No posts found.'}
           {displayPosts.map((post) => {
-            const { path, date, title, summary, tags } = post
+            const { path, date, title, summary, tags, type } = post
             return (
               <li key={path} className="py-4">
                 <article className="space-y-2 xl:grid xl:grid-cols-4 xl:items-baseline xl:space-y-0">
@@ -125,7 +133,11 @@ export default function ListLayout({
                     <div>
                       <h3 className="text-2xl font-bold leading-8 tracking-tight">
                         <Link href={`/${path}`} className="text-gray-900 dark:text-gray-100">
-                          {title}
+                          {`${
+                            type === 'Syndication' && router.pathname.includes('/tags')
+                              ? '【转载】'
+                              : ''
+                          }${title}`}
                         </Link>
                       </h3>
                       <div className="flex flex-wrap">

@@ -5,10 +5,10 @@ import siteMetadata from '@/data/siteMetadata'
 import { kebabCase } from 'pliny/utils/kebabCase'
 import { getAllTags } from 'pliny/utils/contentlayer'
 import { GetStaticProps, InferGetStaticPropsType } from 'next'
-import { allBlogs, allSnippets } from 'contentlayer/generated'
+import { allBlogs, allSnippets, allSyndications } from 'contentlayer/generated'
 
 export const getStaticProps: GetStaticProps<{ tags: Record<string, number> }> = async () => {
-  const tags = await getAllTags([...allBlogs, ...allSnippets])
+  const tags = await getAllTags([...allBlogs, ...allSnippets, ...allSyndications])
 
   return { props: { tags } }
 }

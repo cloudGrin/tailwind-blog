@@ -1,7 +1,7 @@
 import { useState, ReactNode } from 'react'
 import { Comments } from 'pliny/comments'
 import { CoreContent } from 'pliny/utils/contentlayer'
-import type { Blog, Authors } from 'contentlayer/generated'
+import type { Blog, Authors, Syndication, Snippet } from 'contentlayer/generated'
 import Link from '@/components/Link'
 import PageTitle from '@/components/PageTitle'
 import SectionContainer from '@/components/SectionContainer'
@@ -12,7 +12,7 @@ import BlogTags from '@/components/BlogTags'
 import { BlogMeta } from '@/components/BlogMeta'
 
 interface LayoutProps {
-  content: CoreContent<Blog>
+  content: CoreContent<Blog | Syndication | Snippet>
   authorDetails: CoreContent<Authors>[]
   next?: { path: string; title: string }
   prev?: { path: string; title: string }
@@ -23,11 +23,19 @@ const editUrl = (path) => `${siteMetadata.siteRepo}/blob/master/src/data/${path}
 
 export default function PostSimple({ content, authorDetails, children }: LayoutProps) {
   const [loadComments, setLoadComments] = useState(true)
-  const { filePath, path, slug, date, title, tags, readingTime } = content
+  const { filePath, path, slug, date, title, tags, readingTime, type } = content
+  // @ts-ignore
+  const { isEdit: isSyndicationEdit } = content
 
   return (
     <SectionContainer>
-      <BlogSEO url={`${siteMetadata.siteUrl}/${path}`} authorDetails={authorDetails} {...content} />
+      {type !== 'Syndication' && (
+        <BlogSEO
+          url={`${siteMetadata.siteUrl}/${path}`}
+          authorDetails={authorDetails}
+          {...content}
+        />
+      )}
       <ScrollTopAndComment />
       <article>
         <div>
@@ -41,6 +49,11 @@ export default function PostSimple({ content, authorDetails, children }: LayoutP
                   <BlogMeta date={date} path={path} readingTime={readingTime} />
                 </div>
               </dl>
+              {type === 'Syndication' && isSyndicationEdit && (
+                <h5 className="text-lg tracking-tight text-gray-600 dark:text-gray-200 sm:text-xl md:text-2xl">
+                  经编辑后转载
+                </h5>
+              )}
             </div>
           </header>
           <div className="" style={{ gridTemplateRows: 'auto 1fr' }}>
