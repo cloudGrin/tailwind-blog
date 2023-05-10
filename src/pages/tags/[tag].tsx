@@ -1,8 +1,8 @@
 import { TagSEO } from '@/components/SEO'
 import siteMetadata from '@/data/siteMetadata'
 import ListLayout from '@/layouts/ListLayout'
-import { kebabCase } from 'pliny/utils/kebabCase'
-import { getAllTags, allCoreContent, type CoreContent } from 'pliny/utils/contentlayer'
+import { kebabCase } from '@/utils/kebabCase'
+import { getAllTags, allCoreContent, type CoreContent } from '@/utils/contentlayer'
 import { InferGetStaticPropsType } from 'next'
 import { Blog, allBlogs, allSnippets, allSyndications } from 'contentlayer/generated'
 
@@ -23,13 +23,13 @@ export const getStaticProps = async (context) => {
   const tag = context.params.tag as string
   const filteredPosts = allCoreContent([
     ...allBlogs.filter(
-      (post) => post.draft !== true && post.tags.map((t) => kebabCase(t)).includes(tag)
+      (post) => post.draft !== true && post.tags?.map((t) => kebabCase(t)).includes(tag)
     ),
     ...allSnippets.filter(
-      (post) => post.draft !== true && post.tags.map((t) => kebabCase(t)).includes(tag)
+      (post) => post.draft !== true && post.tags?.map((t) => kebabCase(t)).includes(tag)
     ),
     ...allSyndications.filter(
-      (post) => post.draft !== true && post.tags.map((t) => kebabCase(t)).includes(tag)
+      (post) => post.draft !== true && post.tags?.map((t) => kebabCase(t)).includes(tag)
     ),
   ])
 

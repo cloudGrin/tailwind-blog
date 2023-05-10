@@ -1,4 +1,4 @@
-import { kebabCase } from 'pliny/utils/kebabCase'
+import { kebabCase } from '@/utils/kebabCase'
 
 interface TwemojiProps {
   emoji: string

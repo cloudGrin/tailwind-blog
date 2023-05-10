@@ -1,7 +1,7 @@
 import { Snippet } from 'contentlayer/generated'
 import DevIcon from './dev-icons'
 import Link from './Link'
-import { CoreContent } from 'pliny/utils/contentlayer'
+import { CoreContent } from '@/utils/contentlayer'
 
 export function SnippetCard({ snippet }: { snippet: CoreContent<Snippet> }) {
   const { devType, heading, summary, title, slug } = snippet

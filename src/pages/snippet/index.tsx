@@ -1,7 +1,7 @@
 import siteMetadata from '@/data/siteMetadata'
 import SnippetLayout from '@/layouts/SnippetLayout'
 import { PageSEO } from '@/components/SEO'
-import { sortedBlogPost, allCoreContent } from 'pliny/utils/contentlayer'
+import { sortedBlogPost, allCoreContent } from '@/utils/contentlayer'
 import { InferGetStaticPropsType } from 'next'
 import { allSnippets } from 'contentlayer/generated'
 import type { Snippet } from 'contentlayer/generated'

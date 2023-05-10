@@ -1,7 +1,7 @@
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import siteMetadata from '@/data/siteMetadata'
-import { CoreContent } from 'pliny/utils/contentlayer'
+import { CoreContent } from '@/utils/contentlayer'
 import type { Blog, Authors, Snippet, Syndication } from 'contentlayer/generated'
 interface CommonSEOProps {
   title: string
@@ -173,7 +173,7 @@ export const BlogSEO = ({
     <>
       <CommonSEO
         title={title}
-        description={summary}
+        description={summary!}
         ogType="article"
         ogImage={featuredImages}
         twImage={twImageUrl}

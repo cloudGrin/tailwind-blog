@@ -1,9 +1,8 @@
-import { MDXLayoutRenderer } from 'pliny/mdx-components'
 import PageTitle from '@/components/PageTitle'
-import { MDXComponents } from '@/components/MDXComponents'
-import { sortedBlogPost, coreContent } from 'pliny/utils/contentlayer'
+import { sortedBlogPost, coreContent } from '@/utils/contentlayer'
 import { InferGetStaticPropsType } from 'next'
 import { allSyndications, allAuthors } from 'contentlayer/generated'
+import Mdx from '@/components/mdx-components'
 
 const DEFAULT_LAYOUT = 'PostSimple'
 
@@ -22,10 +21,10 @@ export const getStaticProps = async ({ params }) => {
   const prev = prevContent ? coreContent(prevContent) : null
   const nextContent = sortedPosts[postIndex - 1] || null
   const next = nextContent ? coreContent(nextContent) : null
-  const post = sortedPosts.find((p) => p.slug === slug)
+  const post = sortedPosts.find((p) => p.slug === slug)!
   const authorList = post.authors || ['default']
   const authorDetails = authorList.map((author) => {
-    const authorResults = allAuthors.find((p) => p.slug === author)
+    const authorResults = allAuthors.find((p) => p.slug === author)!
     return coreContent(authorResults)
   })
 
@@ -57,10 +56,10 @@ export default function BlogPostPage({
           </PageTitle>
         </div>
       ) : (
-        <MDXLayoutRenderer
+        <Mdx
+          code={post.body.code}
           layout={post.layout || DEFAULT_LAYOUT}
           content={post}
-          MDXComponents={MDXComponents}
           toc={post.toc}
           authorDetails={authorDetails}
           prev={prev}

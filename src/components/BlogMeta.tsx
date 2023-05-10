@@ -1,7 +1,7 @@
 import Twemoji from './Twemoji'
 import ViewCounter from './ViewCounter'
 import { type Blog } from 'contentlayer/generated'
-import { formatDate } from 'pliny/utils/formatDate'
+import { formatDate } from '@/utils/formatDate'
 
 export function BlogMeta({
   date,

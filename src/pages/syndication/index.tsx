@@ -1,5 +1,5 @@
 import ListLayout from '@/layouts/ListLayout'
-import { sortedBlogPost, allCoreContent } from 'pliny/utils/contentlayer'
+import { sortedBlogPost, allCoreContent } from '@/utils/contentlayer'
 import { InferGetStaticPropsType } from 'next'
 import { allSyndications } from 'contentlayer/generated'
 import type { Syndication } from 'contentlayer/generated'

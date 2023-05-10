@@ -1,7 +1,6 @@
-// @ts-check
+import { Config } from '@/@types/config'
 
-/** @type {import("pliny/config").PlinyConfig } */
-const siteMetadata = {
+const siteMetadata: Config = {
   title: "Grin's Blog",
   author: 'WenHan Wang',
   headerTitle: "Grin's Blog",
@@ -30,11 +29,6 @@ const siteMetadata = {
     umamiWebsiteId: 'b3f7bbf6-7fad-4b45-a86a-0c00ca765008', // e.g. 123e4567-e89b-12d3-a456-426614174000
     posthogProjectApiKey: '', // e.g. AhnJK8392ndPOav87as450xd
     googleAnalyticsId: '', // e.g. UA-000000-2 or G-XXXXXXX
-  },
-  newsletter: {
-    // supports mailchimp, buttondown, convertkit, klaviyo, revue, emailoctopus
-    // Please add your .env file and modify it according to your selection
-    provider: 'buttondown',
   },
   comments: {
     // If you want to use an analytics provider you have to add it to the
@@ -82,4 +76,4 @@ const siteMetadata = {
   // },
 }
 
-module.exports = siteMetadata
+export default siteMetadata

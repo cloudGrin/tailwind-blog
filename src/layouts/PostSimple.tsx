@@ -1,6 +1,6 @@
 import { useState, ReactNode } from 'react'
-import { Comments } from 'pliny/comments'
-import { CoreContent } from 'pliny/utils/contentlayer'
+import GiscusComponent from '@/components/GiscusComponent'
+import { CoreContent } from '@/utils/contentlayer'
 import type { Blog, Authors, Syndication, Snippet } from 'contentlayer/generated'
 import Link from '@/components/Link'
 import PageTitle from '@/components/PageTitle'
@@ -21,7 +21,8 @@ interface LayoutProps {
 
 const editUrl = (path) => `${siteMetadata.siteRepo}/blob/master/src/data/${path}`
 
-export default function PostSimple({ content, authorDetails, children }: LayoutProps) {
+export default function PostSimple(props: LayoutProps) {
+  const { content, authorDetails, children } = props
   const [loadComments, setLoadComments] = useState(true)
   const { filePath, path, slug, date, title, tags, readingTime, type } = content
   // @ts-ignore
@@ -41,7 +42,7 @@ export default function PostSimple({ content, authorDetails, children }: LayoutP
         <div>
           <header className="py-5 xl:pb-11 xl:pt-11">
             <div className="space-y-4">
-              <BlogTags tags={tags} />
+              <BlogTags tags={tags!} />
               <PageTitle>{title}</PageTitle>
               <dl>
                 <div>
@@ -70,9 +71,7 @@ export default function PostSimple({ content, authorDetails, children }: LayoutP
                     {!loadComments && (
                       <button onClick={() => setLoadComments(true)}>Load Comments</button>
                     )}
-                    {loadComments && (
-                      <Comments commentsConfig={siteMetadata.comments} slug={slug} />
-                    )}
+                    {loadComments && <GiscusComponent {...siteMetadata.comments.giscusConfig} />}
                   </div>
                 )}
               </div>

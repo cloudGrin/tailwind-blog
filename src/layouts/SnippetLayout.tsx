@@ -1,6 +1,6 @@
 import { SnippetCard } from '@/components/SnippetCard'
 import { Snippet } from 'contentlayer/generated'
-import { CoreContent } from 'pliny/utils/contentlayer'
+import { CoreContent } from '@/utils/contentlayer'
 
 interface SnippetLayoutProps {
   snippets: CoreContent<Snippet>[]

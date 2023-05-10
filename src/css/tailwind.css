@@ -28,8 +28,13 @@ input:-webkit-autofill:focus {
   transition: background-color 600000s 0s, color 600000s 0s;
 }
 
-
-.giscus, .giscus-frame {
+.giscus,
+.giscus-frame {
   width: 100%;
   min-height: 150px;
+}
+
+
+a {
+  word-break: break-all;
 }
