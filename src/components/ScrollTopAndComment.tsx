@@ -1,7 +1,9 @@
+'use client'
+
 import siteMetadata from '@/data/siteMetadata'
 import { useEffect, useState } from 'react'
 
-const ScrollTopAndComment = () => {
+export default function ScrollTopAndComment() {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
@@ -55,5 +57,3 @@ const ScrollTopAndComment = () => {
     </div>
   )
 }
-
-export default ScrollTopAndComment

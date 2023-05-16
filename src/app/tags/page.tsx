@@ -1,0 +1,50 @@
+import Link from '@/components/Link'
+import Tag from '@/components/Tag'
+import siteMetadata from '@/data/siteMetadata'
+import { getAllTags } from '@/utils/contentlayer'
+import { kebabCase } from '@/utils/kebabCase'
+import { allBlogs, allSnippets, allSyndications } from 'contentlayer/generated'
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: `Tags - ${siteMetadata.author}`,
+  description: 'Things I blog about',
+}
+
+const getTags = () => {
+  const tags = getAllTags([...allBlogs, ...allSnippets, ...allSyndications])
+
+  return tags
+}
+
+export default function Tags() {
+  const tags = getTags()
+  const sortedTags = Object.keys(tags).sort((a, b) => tags[b] - tags[a])
+  return (
+    <div className="flex flex-col items-start justify-start divide-y divide-gray-200 dark:divide-gray-700 md:mt-24 md:flex-row md:items-center md:justify-center md:space-x-6 md:divide-y-0">
+      <div className="pt-6 pb-8 space-x-2 md:space-y-5">
+        <h1 className="text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl sm:leading-10 md:border-r-2 md:px-6 md:text-6xl md:leading-14">
+          Tags
+        </h1>
+      </div>
+      <div className="flex flex-wrap max-w-lg">
+        {Object.keys(tags).length === 0 && 'No tags found.'}
+        {sortedTags.map((t) => {
+          return (
+            <div key={t} className="mt-2 mb-2 mr-5">
+              <Tag text={t} />
+              <Link
+                href={`/tags/${kebabCase(t)}`}
+                className="-ml-2 text-sm font-semibold text-gray-600 uppercase dark:text-gray-300"
+                aria-label={`View posts tagged ${t}`}
+              >
+                {` (${tags[t]})`}
+              </Link>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

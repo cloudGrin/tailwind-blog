@@ -1,6 +1,7 @@
+'use client'
 import { useState, useRef, ReactNode } from 'react'
 
-export const Pre = ({ children }: { children: ReactNode }) => {
+export default function Pre({ children }: { children: ReactNode }) {
   const textInput = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(false)
   const [copied, setCopied] = useState(false)

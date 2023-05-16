@@ -1,11 +1,14 @@
+'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/router'
+import { usePathname } from 'next/navigation'
 import { formatDate } from '@/utils/formatDate'
 import { CoreContent } from '@/utils/contentlayer'
 import type { Blog, Syndication, Snippet } from 'contentlayer/generated'
 import Link from '@/components/Link'
 import Tag from '@/components/Tag'
 import siteMetadata from '@/data/siteMetadata'
+import Pagination from '@/components/Pagination'
+import BlogListItem from '@/components/BlogListItem'
 
 interface PaginationProps {
   totalPages: number
@@ -19,46 +22,6 @@ interface ListLayoutProps {
   titleTips?: string
 }
 
-function Pagination({ totalPages, currentPage }: PaginationProps) {
-  const router = useRouter()
-  const basePath = router.pathname.split('/')[1]
-  const prevPage = currentPage - 1 > 0
-  const nextPage = currentPage + 1 <= totalPages
-
-  return (
-    <div className="pt-6 pb-8 space-y-2 md:space-y-5">
-      <nav className="flex justify-between">
-        {!prevPage && (
-          <button className="cursor-auto disabled:opacity-50" disabled={!prevPage}>
-            Previous
-          </button>
-        )}
-        {prevPage && (
-          <Link
-            href={currentPage - 1 === 1 ? `/${basePath}/` : `/${basePath}/page/${currentPage - 1}`}
-            rel="prev"
-          >
-            Previous
-          </Link>
-        )}
-        <span>
-          {currentPage} of {totalPages}
-        </span>
-        {!nextPage && (
-          <button className="cursor-auto disabled:opacity-50" disabled={!nextPage}>
-            Next
-          </button>
-        )}
-        {nextPage && (
-          <Link href={`/${basePath}/page/${currentPage + 1}`} rel="next">
-            Next
-          </Link>
-        )}
-      </nav>
-    </div>
-  )
-}
-
 export default function ListLayout({
   posts,
   title,
@@ -66,7 +29,7 @@ export default function ListLayout({
   pagination,
   titleTips,
 }: ListLayoutProps) {
-  const router = useRouter()
+  const pathname = usePathname()
   const [searchValue, setSearchValue] = useState('')
   const filteredBlogPosts = posts.filter((post) => {
     const searchContent = post.title + post.summary + post?.tags?.join(' ')
@@ -118,42 +81,9 @@ export default function ListLayout({
         </div>
         <ul>
           {!filteredBlogPosts.length && 'No posts found.'}
-          {displayPosts.map((post) => {
-            const { path, date, title, summary, tags, type } = post
-            return (
-              <li key={path} className="py-4">
-                <article className="space-y-2 xl:grid xl:grid-cols-4 xl:items-baseline xl:space-y-0">
-                  <dl>
-                    <dt className="sr-only">Published on</dt>
-                    <dd className="text-base font-medium leading-6 text-gray-500 dark:text-gray-400">
-                      <time dateTime={date}>{formatDate(date, siteMetadata.locale)}</time>
-                    </dd>
-                  </dl>
-                  <div className="space-y-3 xl:col-span-3">
-                    <div>
-                      <h3 className="text-2xl font-bold leading-8 tracking-tight">
-                        <Link href={`/${path}`} className="text-gray-900 dark:text-gray-100">
-                          {`${
-                            type === 'Syndication' && router.pathname.includes('/tags')
-                              ? '【转载】'
-                              : ''
-                          }${title}`}
-                        </Link>
-                      </h3>
-                      <div className="flex flex-wrap">
-                        {tags?.map((tag) => (
-                          <Tag key={tag} text={tag} />
-                        ))}
-                      </div>
-                    </div>
-                    <div className="prose text-gray-500 max-w-none dark:text-gray-400">
-                      {summary}
-                    </div>
-                  </div>
-                </article>
-              </li>
-            )
-          })}
+          {displayPosts.map((post) => (
+            <BlogListItem key={post.slug} post={post} pathname={pathname} />
+          ))}
         </ul>
       </div>
       {pagination && pagination.totalPages > 1 && !searchValue && (

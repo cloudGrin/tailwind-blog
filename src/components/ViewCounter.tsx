@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect } from 'react'
 import { useMutation } from 'urql'
 import { type Blog } from 'contentlayer/generated'

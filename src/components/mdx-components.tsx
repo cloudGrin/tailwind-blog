@@ -1,22 +1,14 @@
-import { useMDXComponent } from 'next-contentlayer/hooks'
+import 'server-only'
 
-import { TOCInline } from '@/components/ui/TOCInline'
-import { Pre } from '@/components/ui/Pre'
+import TOCInline from '@/components/ui/TOCInline'
 
-import Image from './Image'
+import Pre from '@/components/ui/Pre'
+
+import Wrapper from '@/components/Wrapper'
+
+import Image from 'next/image'
 import CustomLink from './Link'
-
-import React, { lazy, Suspense } from 'react'
-export const Wrapper = ({ layout, content, ...rest }) => {
-  const Layout = lazy(() =>
-    import(`../layouts/${layout}`).then((module) => ({ default: module.default }))
-  )
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <Layout content={content} {...rest} />
-    </Suspense>
-  )
-}
+import { getMDXComponent } from 'next-contentlayer/hooks'
 
 const components = {
   Image,
@@ -27,7 +19,7 @@ const components = {
 }
 
 export default function Mdx({ code, ...rest }: any) {
-  const Component = useMDXComponent(code)
+  const Content = getMDXComponent(code)
 
-  return <Component {...rest} components={components} />
+  return <Content {...rest} components={components} />
 }
