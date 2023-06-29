@@ -1,0 +1,987 @@
+---
+title: 如何编写一个友好支持 Tree-shaking 的库
+date: '2023-06-29'
+tags: ['Webpack', 'Rollup', 'Optimization']
+draft: false
+isEdit: false
+---
+
+#### 引入
+
+在日常的前端开发工作中，我们都希望能为用户提供可靠、具有优异性能的应用程序。而在性能优化这一大话题下，削减应用及最终构建包体积尺寸是我们常见的优化思路，而对公司内部使用的内源包、代码库进行支持 Tree Shaking 的改造会是一项典型具备明显收益的优化。
+
+而当你着手进行这项功能的改造后，你可能会发现 Tree Shaking 并不是想象中可以简单通过一个类似 “开关” 开启或关闭的特性，事实上有许多因素都会影响这项优化最终是否能正确生效。
+
+本文尝试提供全面的对于如何编写支持 Tree-shaking 优化代码库的指引，而如果你需要快速的总结步骤，可以参考以下过程：
+
+- 在一个已知构建大小尺寸的应用中引入一个 npm 包，可以快速检测这个 npm 包是否支持 Tree Shaking 优化。
+- 开发的代码需要完全使用 ESM 模块语法来让 bundler 进行静态分析。
+- 在产物的 package.json 选项中提供 sideEffects 标注以便让 webpack 之类的打包器可以分析，并正确提供包的副作用说明。
+- 在最终的生产构建产物，分割各个独立的功能到每个模块中，并保留库的模块树结构。
+- 在转译库代码的过程中，不能进行非 ESM 的模块转译或丢失模块树信息。
+- 使用如 Rollup、webpack 等支持 Tree-shaking 功能的现代打包器。
+
+#### 什么是 Tree-shaking？
+
+参考 MDN 文档上的直观描述：
+
+> Tree shaking 是一个通常用于描述移除 JavaScript 上下文中的未引用代码 (dead-code) 行为的术语；它依赖于 ES2015 中的 import 和 export 语句，用来检测代码模块是否被导出、导入，且被 JavaScript 文件使用。
+
+Tree-shaking 最常见的用途是通过检测代码中的无用导出来实现死代码消除（ dead code elimination ）。它目前被许多现代代码打包器广泛支持，但它最初的想法是被 Rollup 所实现的。
+
+所以，我们为什么叫 Tree-shaking（摇树）？我们可以将应用程序的导入和导出以一颗树的形式进行想象。而健康的叶子和树枝代表了应用程序中使用的导入，而枯叶象征着与树的其他部分分离的最终未使用的代码。摇动这棵树将消除这些我们未使用的代码（死树叶）。
+
+Tree-shaking 为什么很重要？ Tree-shaking 可以对你的客户端应用程序产生明显的优化效果。因为应用中最终的代码体积越大，浏览器在下载、解压、解析和执行方面花费的时间就越多。因此，删除未使用的代码对于你的应用程序提高加载速度而言是显著的。
+
+有很多技术文章都着重于解释什么是 Tree-shaking 和消除死代码。在这里，我们将专注于被终端应用消费的库。如果一个应用程序能够成功地消除它消费库代码中未被使用到的部分，那么这个库就被认为是可以支持 Tree-shaking 的。
+
+<img
+  src="https://mmbiz.qpic.cn/sz_mmbiz_png/meG6Vo0MeviaiaVmF1jKMsUY0kQUibvOm8bD6GF036iahBao9qnAmkZQRGR4RzDsXib6BdljkMU8ENxHMMRIibsibdM9g/640?wx_fmt=png"
+  referrerPolicy="no-referrer"
+/>
+
+#### 如何辨别一个库是否支持 Tree-shaking
+
+这听起来可能是个很显然的问题，但我注意到很多开发者认为他们的库是支持摇树优化的原因是因为它使用了 ESM，或者他们提供了一个对 Tree-shaking 友好的配置。然而，这并不意味着你的库一定是支持 Tree-shaking 的。
+
+这给我们带来了问题：如何才能有效地检查一个库是支持 Tree-shaking 的？
+
+要做到这一点，我们需要了解两件事：
+
+- 最终只有应用程序的打包器可以摇动库的代码，而不是库的打包器（库在发布到 npm 前往往也有打包构建工作）。毕竟，只有应用程序知道我们库的哪部分代码会被使用。
+- 库的工作是确保它能被最终消费应用的打包器 Tree-shaking。
+
+为了检查一个库是否可以进行 Tree-shaking，我们需要一个已知项目对参考应用程序进行测试：
+
+- 使用一个你熟悉的支持 Tree-shaking 现代打包器（如 webpack 或 Rollup ）创建一个简单的应用程序。
+- 将你要测试的库设置为当前所创建应用程序的依赖项。
+- 导入库中的任意一个模块，并检查应用程序的最终构建结果。
+- 检查构建输出是否只包含对应导入的模块。
+
+这种策略将使测试独立于我们现有的应用程序。这不仅使测试变得容易，还允许我们在不破坏任何其他配置的情况下引入这个库。确保问题不来自于应用程序打包器的配置。
+
+例如我们将测试为名为 user-library 的库，我们将针对使用 webpack 打包的 user-app 应用程序进行测试。
+
+user-library 库看起来像是这样：
+
+```JavaScript
+ export const getUserName = () => "John Doe";
+
+ export const getUserPhoneNumber = () => "***********";
+
+```
+
+它只是在一个入口文件中导出 2 个函数，我们通过 npm 包来使用。
+
+我们的 user-app 看起来像是这样
+
+```JavaScript
+ // package.json
+ {
+   "name": "user-app",
+   "version": "1.0.0",
+   "description": "",
+   "main": "index.js",
+   "scripts": {
+     "build": "webpack"
+   },
+   "author": "",
+   "license": "ISC",
+   "devDependencies": {
+     "webpack": "^5.18.0",
+     "webpack-cli": "^4.3.1"
+   },
+   "dependencies": {
+     "user-library": "1.0.0"
+   }
+ }
+
+```
+
+简单的 webpack 配置如：
+
+```JavaScript
+ const path = require("path");
+
+ module.exports = {
+   entry: "./src/index.js",
+   output: {
+     filename: "main.js",
+     path: path.resolve(__dirname, "dist"),
+   },
+   mode: "development",
+   optimization: {
+     usedExports: true,
+     innerGraph: true,
+     sideEffects: true,
+   }
+ };
+
+```
+
+为了理解我们演示应用程序的 webpack 配置，我们需要了解 webpack 是如何进行摇树优化的：
+
+- 确定应用程序的入口文件（通过 webpack 的用户配置）。
+- 通过循环引入入口文件包含的依赖和子依赖模块来创建一个关于应用程序的模块树。
+- 辨别模块树中每个模块的哪些导出语句没有被其他模块引入。
+- 使用 UglifyJS 或 Terser 等代码压缩工具消除未使用的导出及其相关代码。
+
+上述过程只发生在代码的生产构建阶段。然而生产阶段的问题在于我们的代码都被进行了压缩混淆，所以我们很难通过实际的构建代码函数命名来分辨摇树优化是否生效。
+
+为了解决这个问题，我们可以在开发模式下运行 webpack，同时因为仍要确定哪些代码是未使用的，我们将 optimization 属性设置为：
+
+```JavaScript
+ optimization: {
+     usedExports: true,
+     sideEffects: true,
+     innerGraph: true,
+ }
+
+```
+
+usedExports 属性允许 webpack 识别哪些模块的导出没有被其他模块使用。我们的应用源代码大概长这样：
+
+```JavaScript
+ import { getUserName } from "user-library";
+
+ console.log(getUserName());
+
+```
+
+经过开发环境构建后，这是它的产物：
+
+```JavaScript
+ /***/ "./node_modules/user-library/dist/index.js":
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ ((__unused_webpack_module, exports) => {
+
+ var __webpack_unused_export__;
+
+ __webpack_unused_export__ = ({ value: true });
+
+ const getUserName = () => 'John Doe';
+
+ const getUserPhoneNumber = () => '***********';
+
+ exports.getUserName = getUserName;
+ __webpack_unused_export__ = getUserPhoneNumber;
+ /***/ })
+
+```
+
+webpack 将所有的代码重新组合在了一个文件当中。先看一下  `getUserPhoneNumber`  的导出，我们注意到 webpack 已经将它标记为未使用。在生产模式下，它将被删除，而  `getUserName`  被导出，因为它被 index.js 入口文件所使用。
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzjVAicnzeLGDcvsS8ejhlX81aLFzcNwYGJVlrfYHBehicuFwRXSQuHqJJsibfUgkjlicvJ/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+这个库是支持树摇优化的！你可以重复这个步骤，对多个导入的代码进行处理，并看看输出的代码。目的是确保库中未使用的代码被 webpack 标记为未使用。
+
+对于我们这个非常简单的 user-library 库来说，事情看上去非常美好，让我们将情况变得更复杂一些，再看看摇树优化所需要的条件是否会发生改变。
+
+#### 使用 ESM 语法便于 bundler 进行静态分析
+
+对于库作者来说，这个要求是常见的。但在我看来稍有些误导，我经常听到一些开发者说，我们需要使用 ESM 语法，这样我们的库就可以支持 Tree-shaking。虽然这种说法看似是正确的，但也带来误解 —— 认为只要使用 ESM 语法就足以支持摇树优化。
+
+对于消费者来说，JavaScript 模块最终的构建形式有很多种：ESM, CJS, UMD, IIFE 等等。
+
+为了简单起见，我们将只考虑最常见的两种：ESM （常说的 ES6 模块语法）和 CommonJS （CJS）。大多数比较老的代码库广泛使用了 CJS ，因为它允许在最早的 Node 程序中运行（尽管现在 Node 也支持 ESM）。但事实是 ESM 出现的时间比 CJS 晚得多，在 2015 年的 ECMAScript 2015（也被称为 ES6）正式落地后才被认为是 JavaScript 的标准模块系统。
+
+CJS 语法的例子：
+
+```JavaScript
+ const { userAccount } = require("./userAccount");
+
+ const getUserAccount = () => {
+   return userAccount;
+ };
+
+ module.exports = { getUserAccount };
+
+```
+
+ESM 语法的例子：
+
+```JavaScript
+ import { userAccount } from "./userAccount";
+
+ export const getUserAccount = () => {
+   return userAccount;
+ };
+
+```
+
+两者之间被认为最大的区别是 ESM 的导入是静态的，而 CJS 的导入是动态的，这意味着我们可以用 CJS 做以下事情：
+
+```JavaScript
+ if (someCondition) {
+   const { userAccount } = require("./userAccount");
+ }
+
+```
+
+虽然这似乎看上去更灵活，但它也意味着代码打包器不能在编译或构建时形成一个有效的应用程序依赖树。因为例如 someCondition 等变量的值只有在运行时才知道，这迫使打包器在任何情况下都要在编译时导入 userAccount，导致打包器只是在构建代码中直接包含所有 CJS 风格的模块引入，而无法检查这些导入是否确实被使用。
+
+我们可以在我们的 user-library 中测试这一点：
+
+```JavaScript
+ // src/userAccount.js
+ const userAccount = {
+   name: "user account",
+ };
+
+ module.exports = { userAccount };
+ // src/index.js
+ const { userAccount } = require("./userAccount");
+
+ const getUserName = () => "John Doe";
+
+ const getUserPhoneNumber = () => "***********";
+
+ const getUserAccount = () => userAccount;
+
+ module.exports = {
+   getUserName,
+   getUserPhoneNumber,
+   getUserAccount,
+ };
+
+```
+
+我们的应用代码不做改动，还是不在实际代码中引入  `getUserAccount`  等相关依赖：
+
+```JavaScript
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+ const { userAccount } = __webpack_require__(/*! ./userAccount */ "./node_modules/user-library/dist/userAccount.js")
+
+ const getUserName = () => 'John Doe'
+
+ const getUserPhoneNumber = () => '***********'
+
+ const getUserAccount = () => userAccount
+
+ module.exports = {
+     getUserName,
+     getUserPhoneNumber,
+     getUserAccount
+ }
+ /***/ }),
+
+ /***/ "./node_modules/user-library/dist/userAccount.js":
+ /*!*******************************************************!*\
+   !*** ./node_modules/user-library/dist/userAccount.js ***!
+   \*******************************************************/
+ /***/ ((module) => {
+
+ const userAccount = {
+     name: 'user account'
+ }
+
+ module.exports = { userAccount }
+ /***/ })
+
+```
+
+所有三个导入的文件仍然出现，并且没有被 webpack 标记为未使用。我们的  `userAccount`  文件也是如此，它将被包含在产物中。
+
+现在我们来看看同样的例子，使用 ESM，只需将 require 和 exports 的语法替换为 ESM 对应语法：
+
+```JavaScript
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+ /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+ /* harmony export */   "getUserName": () => /* binding */ getUserName
+ /* harmony export */ });
+ /* unused harmony exports getUserAccount, getUserPhoneNumber */
+ /* harmony import */ var _userAccount_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./userAccount.js */
+ "./node_modules/user-library/dist/userAccount.js");
+
+ const getUserName = () => 'John Doe';
+
+ const getUserPhoneNumber = () => '***********';
+
+ const getUserAccount = () => userAccount;
+
+ /***/ }),
+ /***/ "./node_modules/user-library/dist/userAccount.js":
+ /*!*******************************************************!*\
+   !*** ./node_modules/user-library/dist/userAccount.js ***!
+   \*******************************************************/
+ /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+ /* unused harmony export userAccount */
+ const userAccount = {
+     name: 'user account'
+ };
+ /***/ })
+
+```
+
+注意  `getUserAccount`  和  `getUserPhoneNumber`  被标记为未使用，但另一个文件中的  `userAccount`  导出也是如此。这是由于 innerGraph 的优化，webpack 能够将入口文件中的  `userAccount`  导入与  `getUserAccount`  导出关联起来。这使得 webpack 能够从入口文件中递归地进行工作，并通过其所有的依赖关系来了解模块中哪些导出是未使用的。由于 webpack 知道  `getUserAccount`  是未使用的，它可以去检查它在 userAccount 文件中的依赖关系，并在那里做同样的工作。
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzjm2ibJa17xBbAaG9UwfYYh8piaRt3rbBJJMELFiaSDbC1gnJGiaPnSHZibnUjbaTlgyg1m/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+ESM 允许我们寻找在应用程序中使用或未使用的导出，这解释了为什么静态模块系统对摇树优化如此重要。它还解释了为什么应该使用导出 ES 模块兼容构建的依赖关系，如 lodash-es（相当于流行的 lodash 库的 ESM 版本）。
+
+然而，使用 ESM 模块并不是支持 Tree-shaking 的充分条件，在我们上述的例子中，我们留意到 webpack 在每个文件中递归的工作，以查看导出的代码是否被使用或未使用。在这种情况下，webpack 理论上可以完全忽略 userAccount 文件，因为唯一来自该文件的导入是未使用的！这就引出了我们在下一部分将讨论的副作用概念。
+
+我们先总结一下：
+
+- ESM 是支持摇树的一个必要条件，但不是充分条件。
+- 作为库作者，请确保总是提供你的库的 ESM 构建。如果你的消费者同时需要 ESM 和 CJS 构建，请通过 package.json 中的 main 和 module 字段来分别提供入口。
+- 请确保你使用的库的依赖也是 ESM 的，不然它们将无法进行摇树优化。
+
+#### 使用 sideEffects 字段来标识你的库
+
+根据 webpack 的文档，摇树优化可以被拆分成以下两个优化：
+
+- `usedExports`: 确定一个模块的哪些导出被使用，哪些没有被使用。
+- `sideEffects`: 跳过那些导出内容没有被使用过，也不具备副作用的模块。
+
+为了说明副作用，我们拿之前使用的例子来说明：
+
+```JavaScript
+ import { userAccount } from "./userAccount";
+
+ function getUserAccount() {
+   return userAccount;
+ }
+
+```
+
+如果  `getUserAccount`  没有被使用，打包器是否可以认为  `userAccount`  模块也可以被删除？答案是否定的！因为  `userAccount`  模块内可以做各种各样的事情，甚至可以影响到应用程序的其他模块。因为它可以在全局环境中注入一些变量，它也可以是一个 css 模块在文档中注入样式。一个更好的例子是 polyfill，因为我们通常会这样导入它们，例如：
+
+```JavaScript
+ import "promise-polyfill";
+
+```
+
+现在这个模块肯定具有副作用，因为它一被导入就会影响整个应用程序的代码。打包器会把这个模块看作是可能被删除的候选模块，因为我们没有使用它的任何导出。但删除这个模块会破坏我们的应用程序。
+
+因此，在默认配置下，像 webpack 或 Rollup 这样的构建程序会把我们库中的每个模块默认为充满了副作用，因为删除代码总是危险的。
+
+但在我们的案例中，我们知道我们的库是没有副作用的！因此，我们可以告知打包器，要做到这一点，大多数构建程序会读取 package.json 文件中的 sideEffects 属性。当未指定时，它默认设置为 "true"（每个模块都含有副作用）。你可以把它设置为 false（每个模块都是纯净没有副作用的），又或者你可以指定一个有副作用的文件列表数组：
+
+```JavaScript
+ {
+   "name": "user-library",
+   "version": "1.0.0",
+   "description": "",
+   "sideEffects": false,
+   "main": "dist/index.js",
+   "scripts": {
+     "test": "echo \"Error: no test specified\" && exit 1"
+   },
+   "author": "",
+   "license": "ISC"
+ }
+
+```
+
+我们重新运行 webpack：
+
+```JavaScript
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ (__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+   /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+     /* harmony export */ getUserName: () => /* binding */ getUserName,
+     /* harmony export */
+   });
+   /* unused harmony exports getUserAccount, getUserPhoneNumber */
+
+   const getUserName = () => "John Doe";
+
+   const getUserPhoneNumber = () => "***********";
+
+   const getUserAccount = () => userAccount;
+   /***/
+ };
+
+```
+
+我们可以看到  `userAccount`  文件已经从产物中删除了。我们仍然可以看到引用  `userAccount`  的  `getUserAccount`  函数，但这个函数已经被 webpack 标记为死代码，它将在生产构建的最小化过程中被删除。
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzjJoicHulvRONIQw9EiapG1s8eaY0z394x8QSvOr8TLR0ZxQXvwZo5CUiaeNQLSHkntmR/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+sideEffects 标志对于那些存在入口文件导出 API 的库来说特别重要，这些索引入口文件本身也从内部导出函数或变量。如果没有副作用标识，我们的打包程序将不得不解析所有定义了我们导出变量的文件。
+
+正如 webpack 文档中提到的，副作用标识比起检测无用的导出来说是更有效的优化手段，因为它允许跳过整个子树或者子模块的扫描。
+
+为了更好地理解这两种优化的干预方式的区别，我们可以尝试进行总结：
+
+- sideEffects：如果一个导入模块的内容没有被使用，它允许我们完全跳过一个导入的模块。
+- usedExports：它允许我们删除那些从未被任何模块导入的导出，但模块还是被引入。
+
+但跳过文件、模块与只是说跳过这些文件的未使用导出有什么不同？
+
+大多数情况下，可以摇树优化的库，存在和不存在副作用标识的优化会得到相同的结果，相同尺寸的代码将被包含在最终的打包产物中。然而，在某些情况下，尤其是当分析代码中未使用的导出变得复杂时，情况就不是这样了。下一小节涵盖了其中两种常见情况，即只有分割模块与 sideEffects 标识优化结合才能提供最好的摇树结果。
+
+总结本小节：
+
+- 摇树优化由两部分组成：usedExports 和 sideEffects 。
+- 副作用标识比单单检测每个模块中的未使用导出更加高效。
+- 作为库作者，尽量使你的代码库模块纯净且不具备副作用。
+- 确保通过 package.json 文件中的 sideEffects 属性来标识库的副作用情况。
+
+#### 保留库的模块树，将产物代码分割成小模块
+
+你可能已经留意到，我们在这篇文章中使用的演示 npm 包 user-library 的例子没有使用打包构建，这个库只是简单暴露了一些我们手动添加的 JS 文件。
+
+而多数情况下，我们发布的代码包会因多种原因而需要构建打包的过程，常见的有：
+
+- 自定义导入路径
+- 该库产物使用需要转译，如 Sass 或 TypeScript
+- 库需要提供多种格式（ESM、CJS、IIFE 等）
+
+像 webpack、Rollup、Parcel 或 Esbuild 这样流行的代码打包器是为了提供一个可以给浏览器终端运行的构建产物。因此，他们默认会倾向于创建少数量的产物文件，以重新组合你的所有代码，以便只需要通过尽可能少的网络请求来发送 JS 文件。
+
+但从摇树优化的角度来看，这产生了一个问题：由于产物数量单一，所以基本没有模块可以被跳过，因此副作用优化事实上是不存在的。
+
+我们将展示两种情况，在这两种情况下将说明拆分模块与 sideEffect 优化相结合，对摇树优化结果至关重要。
+
+首先是一个库模块导入了一个 CJS 格式的依赖 (Lodash)，我们将使用 Rollup 来打包我们的库：
+
+```JavaScript
+ // rollup.config.js
+ export default {
+   input: "src/index.js",
+   output: {
+     file: "dist/index.js",
+     format: "esm",
+   },
+ };
+ // userAccount.js
+ import { isNil } from "lodash";
+
+ export const checkExistance = (variable) => !isNil(variable);
+
+ export const userAccount = {
+   name: "user account",
+ };
+
+```
+
+注意我们导出了 checkExistance 函数，我们在库的 index 文件中导入它。
+
+下面是 dist/index.js 中的输出结果：
+
+```JavaScript
+ import { isNil } from "lodash";
+
+ const checkExistance = (variable) => !isNil(variable);
+
+ const userAccount = {
+   name: "user account",
+ };
+
+ const getUserAccount = () => {
+   return userAccount;
+ };
+
+ const getUserPhoneNumber = () => "***********";
+
+ const getUserName = () => "John Doe";
+
+ export { checkExistance, getUserName, getUserPhoneNumber, getUserAccount };
+
+```
+
+所有代码都被打包在一个文件中。此外注意，Lodash 是在顶部导入的。我们仍然会在我们的应用程序中导入相同的函数，这意味着尽管 checkExistance 没有被使用。但在运行 webpack 后，整个 Lodash 库依然会被导入：
+
+```JavaScript
+ /***/ "./node_modules/user-library/dist/index.js":
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+ "use strict";
+ /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+ /* harmony export */   "getUserName": () => (/* binding */ getUserName)
+ /* harmony export */ });
+ /* unused harmony exports checkExistance, userAccount, getUserPhoneNumber, getUserAccount */
+ /* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lodash */ "./node_modules/user-library/node_modules/lodash/lodash.js");
+ /* harmony import */ var lodash__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(lodash__WEBPACK_IMPORTED_MODULE_0__);
+
+ const checkExistance = (variable) => !isNil(variable);
+
+ const userAccount = {
+   name: "user account",
+ };
+
+ const getUserPhoneNumber = {
+     number: '***********'
+ };
+
+ const getUserAccount = () => {
+     return userAccount
+ };
+
+ const getUserName = () => 'John Doe';
+
+ /***/ }),
+
+ /***/ "./node_modules/user-library/node_modules/lodash/lodash.js":
+ /*!*****************************************************************!*\
+   !*** ./node_modules/user-library/node_modules/lodash/lodash.js ***!
+   \*****************************************************************/
+ /***/ (function(module, exports, __webpack_require__) {
+
+ /* module decorator */ module = __webpack_require__.nmd(module);
+ var __WEBPACK_AMD_DEFINE_RESULT__;/**
+  * @license
+  * Lodash <https://lodash.com/>
+  * Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
+  * Released under MIT license <https://lodash.com/license>
+  * Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>
+  * Copyright Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+  */
+ // ...
+
+```
+
+由于我们此处使用的 Lodash 为 CJS 格式，webpack 将无法对其进行摇树优化。这是一个问题，因为我们明确地组织了我们库的模块依赖关系，所以 Lodash 应该只在我们应用程序中未使用的  `userAccount`  模块中被导入。而如果模块结构可以被保留下来，webpack 可以检测到没有使用  `userAccount`，并会直接跳过这个模块，从而根据 sideEffects 标识来导入 Lodash。
+
+在 Rollup 中，我们可以使用 preserveModules 选项来选择在产物中保留源代码模块的结构（当然其他打包器也有提供类似选项）：
+
+```JavaScript
+ export default {
+   input: "src/index.js",
+   output: {
+     dir: "dist",
+     format: "esm",
+     preserveModules: true,
+   },
+ };
+
+```
+
+现在 Rollup 的产物保留了原始的模块树结构，我们再次运行 webpack：
+
+```JavaScript
+ /***/ "./node_modules/user-library/dist/index.js":
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+ /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+ /* harmony export */   "getUserName": () => (/* binding */ getUserName)
+ /* harmony export */ });
+ /* unused harmony export getUserAccount */
+
+ const getUserAccount = () => {
+     return userAccount
+ };
+
+ const getUserName = () => 'John Doe';
+
+ /***/ })
+
+```
+
+Lodash 模块现在和整个 userAccount 模块一起被跳过。
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzjHEpVJhezaiaQp3DOiaxsoictIR0l0u6dbS8FdzGgAshjjL13UJj8SWAlLqzMJ1pxYuD/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+#### 代码分割
+
+保留模块结构在可以支持 sideEffects 优化的同时也有利于 webpack 做代码分割，代码分割是大型应用的一个关键性能优化手段，被广泛用于多页面的 Web 应用中。像 Nuxt 或 Next 这样的前端框架都使用基于页面路由做代码分割。
+
+为了说明优势，我们看看当库产物被打包在一个文件中会发生什么：
+
+```JavaScript
+ // user-library/src/userAccount.js
+ export const userAccount = {
+   name: "user account",
+ };
+ // user-library/src/userPhoneNumber.js
+ export const userPhoneNumber = {
+   number: "***********",
+ };
+ // user-library/src/index.js
+ import { userAccount } from "./userAccount";
+ import { userPhoneNumber } from "./userPhoneNumber";
+
+ const getUserName = () => "John Doe";
+
+ export { userAccount, getUserName, userPhoneNumber };
+
+```
+
+为了对我们的应用程序进行代码分割，我们使用 webpack 的动态引入语法：
+
+```JavaScript
+ // user-app/src/userService1.js
+ import { userAccount } from "user-library";
+
+ export const logUserAccount = () => {
+   console.log(userAccount);
+ };
+ // user-app/src/userService2.js
+ import { userPhoneNumber } from "user-library";
+
+ export const logUserPhoneNumber = () => {
+   console.log(userPhoneNumber);
+ };
+ // user-app/src/index.js
+ const main = async () => {
+   const { logUserPhoneNumber } = await import("./userService2");
+   const { logUserAccount } = await import("./userService1");
+
+   logUserAccount();
+   logUserPhoneNumber();
+ };
+
+ main();
+
+```
+
+现在应用程序的构建产物现在有 3 个文件：`main.js`、`src_userService1_js.main.js`  和  `src_userService2_js.main.js`。仔细看看  `src_userService2_js.main.js`，我们可以看到整个 user-library 包都被添加了：
+
+```JavaScript
+ (self["webpackChunkuser_app"] = self["webpackChunkuser_app"] || []).push([
+   ["src_userService1_js"],
+   {
+     /***/ "./node_modules/user-library/dist/index.js":
+       /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+       /***/ (
+         __unused_webpack_module,
+         __webpack_exports__,
+         __webpack_require__
+       ) => {
+         "use strict";
+         /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+           /* harmony export */ userAccount: () => /* binding */ userAccount,
+           /* harmony export */ userPhoneNumber: () =>
+             /* binding */ userPhoneNumber,
+           /* harmony export */
+         });
+         /* unused harmony export getUserName */
+         const userAccount = {
+           name: "user account",
+         };
+
+         const userPhoneNumber = {
+           number: "***********",
+         };
+
+         const getUserName = () => "John Doe";
+
+         /***/
+       },
+
+     /***/ "./src/userService1.js":
+       /*!*****************************!*\
+   !*** ./src/userService1.js ***!
+   \*****************************/
+       /***/ (
+         __unused_webpack_module,
+         __webpack_exports__,
+         __webpack_require__
+       ) => {
+         "use strict";
+         __webpack_require__.r(__webpack_exports__);
+         /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+           /* harmony export */ logUserAccount: () =>
+             /* binding */ logUserAccount,
+           /* harmony export */
+         });
+         /* harmony import */ var user_library__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(
+           /*! user-library */ "./node_modules/user-library/dist/index.js"
+         );
+
+         const logUserAccount = () => {
+           console.log(user_library__WEBPACK_IMPORTED_MODULE_0__.userAccount);
+         };
+
+         /***/
+       },
+   },
+ ]);
+
+```
+
+然而 userService2 只使用了 userPhoneNumber，userAccount 却没有被标记为未使用... 这是为什么？
+
+我们需要理解 usedExports 的优化只会在单一模块的范围内检查已使用的导出，只有在模块维度 webpack 才能判断、删除未使用的代码。但从我们库模块的角度来看，userAccount 和 userPhoneNumber 实际上都被使用（因为这个模块的两组函数都被导出且存在外部引入）。这种情况下，webpack 无法区分 userService1 和 userService2 的导入，如下图所示（userAccount 和 userPhoneNumber 都是绿色的）。
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzj1BVYZrwIsK3oRrk8mvKbOkoEIESxxeHxUBbbicYgYuGWxGKyoBPNbqvkvBU994SPS/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+这意味着 webpack 在仅依靠 usedExports 进行优化时，无法独立地树状摇动每个 chunk 的出口。
+
+但我们现在尝试在打包库产物时保留模块关系，以允许 sideEffects 进行优化。
+
+webpack 仍然将输出同样的 3 个文件，但这次，`src_userService2_js.main.js`  将只包含来自  `userPhoneNumber`  的代码。
+
+```JavaScript
+ (self["webpackChunkuser_app"] = self["webpackChunkuser_app"] || []).push([
+   ["src_userService2_js"],
+   {
+     /***/ "./node_modules/user-library/dist/userPhoneNumber.js":
+       /*!***********************************************************!*\
+   !*** ./node_modules/user-library/dist/userPhoneNumber.js ***!
+   \***********************************************************/
+       /***/ (
+         __unused_webpack_module,
+         __webpack_exports__,
+         __webpack_require__
+       ) => {
+         "use strict";
+         /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+           /* harmony export */ userPhoneNumber: () =>
+             /* binding */ userPhoneNumber,
+           /* harmony export */
+         });
+         const userPhoneNumber = {
+           number: "***********",
+         };
+
+         /***/
+       },
+
+     /***/ "./src/userService2.js":
+       /*!*****************************!*\
+   !*** ./src/userService2.js ***!
+   \*****************************/
+       /***/ (
+         __unused_webpack_module,
+         __webpack_exports__,
+         __webpack_require__
+       ) => {
+         "use strict";
+         __webpack_require__.r(__webpack_exports__);
+         /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+           /* harmony export */ logUserPhoneNumber: () =>
+             /* binding */ logUserPhoneNumber,
+           /* harmony export */
+         });
+         /* harmony import */ var user_library__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(
+           /*! user-library */ "./node_modules/user-library/dist/userPhoneNumber.js"
+         );
+
+         const logUserPhoneNumber = () => {
+           console.log(
+             user_library__WEBPACK_IMPORTED_MODULE_0__.userPhoneNumber
+           );
+         };
+
+         /***/
+       },
+   },
+ ]);
+
+```
+
+`src_userService1_js.main.js`  的行为与此相同，因为它只包括库中的  `userAccount`  模块。
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzjPBwpUyeVGibV9ibVEy7StTiaia44MPm8BHgibib2s69PT7jWj9d1EmibJNBlCHdoYmtyAhp/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+根据上述图表，我们可以看到  `userAccount`  和  `userPhoneNumber`  仍然被认为是有效的导出，因为它们在我们的应用程序中被至少使用过一次。然而，这次 sideEffects 标识能够跳过 userAccount 模块，因为它从未被  `userService2`  导入。同样的事情也发生在  `userPhoneNumbe`r 和  `userService1`  上。
+
+我们现在可以理解为什么保留库的原始模块结构很重要。因为假如原始产物只有一个模块文件（例如一个包含所有代码的 index.js 文件），模块引入信息事实上会出现丢失。而为了实现一个支持最佳摇树优化效果的库，你的代码产物应该被分成多个独立模块，每个模块处理单一逻辑。
+
+用树来比喻，我们应该把树的每片叶子看作一个模块。当树被摇动时，较小和较弱的叶子才能更好地落下！而如果树的叶子较少或单个叶子较大，摇动它就不会有明显的结果。
+
+总结一下：
+
+- 我们应该保留库产物的模块结构，以便其充分受益于 sideEffects 的优化。
+- 库产物应该被分割成多个独立的小模块，每个模块只负责一段逻辑。
+- 在使用代码分割的应用程序中，树摇优化的模块只能在 sideEffects 优化下工作。
+
+#### 在转译库时，不能丢失模块树或 ESM 特征
+
+代码打包器并不是唯一会影响库的摇树优化的工具。众所周知，转译器也可能移除 ES 模块或因为丢失模块树信息而对摇树优化结果产生影响。
+
+使用转译器的目的之一是使你的代码与那些不一定支持 ESM 的浏览器兼容。但我们应该记住，我们发布的代码库并不是要直接提供给浏览器终端消费（除非是 umd 产物），而是由应用程序来消费。因此，出于以下两个原因，应该禁止向下转译我们的库来适配、兼容特定的浏览器：
+
+当你发布一个库时，作为作者你不知道应该针对哪个版本的浏览器，只有消费的应用程序知道。  
+转译库可能使产物丧失摇树优化。  
+如果你的库因为某种原因需要转译，需要确保转译不会删除 ESM 语法或原始模块树结构信息，原因与本文之前解释的一样。
+
+据我所知，有两个最常见的工具在转译库时会删除了库的树状可摇动特性。
+
+##### Babel
+
+Babel 使用 babel-preset-env 来使你的代码与目标浏览器兼容。默认情况下，这个插件会从库中删除 ES 模块。为了确保这种情况不会发生，请将 modules 选项设置为 false ：
+
+```JavaScript
+ module.exports = {
+   env: {
+     esm: {
+       presets: [
+         [
+           "@babel/preset-env",
+           {
+             modules: false,
+           },
+         ],
+       ],
+     },
+   },
+ };
+
+```
+
+##### TypeScript
+
+在编译你的代码时，tsc 会根据你在 tsconfig.json 文件中设置的目标和模块选项来编译你的模块。
+
+为了确保这种情况不会发生，至少要将 target 和 module 选项设置为 ES2015 或 ES6，常规的库编译成 esnext 即可。
+
+总结：
+
+- 确保你使用的转译器 / 编译器没有从你的库中删除 ES 模块语法。
+- 要检查这种情况是否发生，可以观察库的输出，检查其中的 ESM 语法和产物结构。
+
+#### 使用新版本的代码构建器
+
+JavaScript 中的摇树优化是由 Rollup 发扬光大的。而 webpack 从 2.x 开始支持这个功能，而现代打包器在树摇优化方面也做的越来越好。
+
+还记得我们上文使用过允许 webpack 将模块导出与模块的导入相联系的 innerGraph 选项，这个优化是在 webpack 5 中引入的。这个优化允许 webpack 递归地寻找未使用的导出。
+
+为了显示它的实际作用，我们可以考虑改变我们库中的 index.js 文件：
+
+```JavaScript
+ import { userAccount } from "./userAccount";
+
+ const getUserAccount = () => {
+   return userAccount;
+ };
+
+ const getUserName = () => "John Doe";
+
+ export { getUserName, getUserAccount };
+
+```
+
+我们的 user-app 只用到了 getUserName：
+
+```JavaScript
+ import { getUserName } from "user-library";
+
+ console.log(getUserName());
+
+```
+
+我们可以比较有和没有 innerGraph 优化的输出。我们仍然开启 usedExports 和 sideEffects 优化。
+
+没有 innerGraph 优化（例如使用 webpack 4）：
+
+```JavaScript
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /*! exports provided: userAccount, userPhoneNumber, getUserName, getUserAccount */
+ /*! exports used: getUserName */
+ /***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+ "use strict";
+ /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return getUserName; });
+ /* unused harmony export getUserAccount */
+ /* harmony import */ var _userAccount_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./userAccount.js */
+ "./node_modules/user-library/dist/userAccount.js");
+
+ const getUserAccount = () => {
+     return _userAccount_js__WEBPACK_IMPORTED_MODULE_0__[/* userAccount */ "a"]
+ };
+
+ const getUserName = () => 'John Doe';
+
+ /***/ }),
+
+ /***/ "./node_modules/user-library/dist/userAccount.js":
+ /*!*******************************************************!*\
+   !*** ./node_modules/user-library/dist/userAccount.js ***!
+   \*******************************************************/
+ /*! exports provided: userAccount */
+ /*! exports used: userAccount */
+ /***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+ "use strict";
+ /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return userAccount; });
+ const userAccount = {
+     name: 'user account'
+ };
+
+ /***/ }),
+
+```
+
+开启 innerGraph 优化（在 webpack5 中）：
+
+```JavaScript
+ /***/ "./node_modules/user-library/dist/index.js":
+ /*!*************************************************!*\
+   !*** ./node_modules/user-library/dist/index.js ***!
+   \*************************************************/
+ /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+ /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+ /* harmony export */   "getUserName": () => (/* binding */ getUserName)
+ /* harmony export */ });
+ /* unused harmony export getUserAccount */
+
+ const getUserAccount = () => {
+     return userAccount
+ };
+
+ const getUserName = () => 'John Doe';
+
+ /***/ })
+
+```
+
+<img
+  src="https://mmbiz.qpic.cn/mmbiz_svg/Tjnia6K0WAwyYwdnvkCpY356jcem9erzj5ibQuRwWHibxnW2TicBBayu9BZubnrYkt5CkKEH7KuFT1hiasnkB4bRicTlUA5S7lNaRI/640?wx_fmt=svg"
+  referrerPolicy="no-referrer"
+/>
+
+我们可以发现在 webpack5 能够完全消除 userAccount 模块，但 webpack4 却不是这样（即使 getUserAccount 被标记为未使用）。这是因为后来引入的 innerGraph 算法允许 webpack5 将我们模块中未使用的代码内容与它的导入进行关联。在我们的例子中，userAccount 模块只被 getUserAccount 函数使用，因此当 getUserAccount 函数未被使用时它可以被跳过。
+
+这种优化在 webpack4 中是没有的。因此，在使用 webpack4 时，开发者应该小心的限制单个文件中的导出数量。如果一个文件包含多个导出， webpack 将包含该文件所有的模块导入，尽管它们可能并不是当前导出所必需引入的模块。
+
+一般来说，为了更好的性能优化，我们应该确保我们使用的代码打包器始终是最新的稳定版本，以便获取最佳的摇树优化效果。
+
+#### 总结
+
+摇树优化不是一个可以通过在配置文件中添加或删除特定的行就可以随时开启或关闭的功能。库产物最终可以被摇树优化的效果取决于多种因素，本文介绍了其中最关键的几个。此外，本文还着重介绍了两件常用的手段，来帮助你编写支持摇树优化的库：
+
+- 如果要了解库对摇树优化的支持程度，我们可以在一个受控环境中使用我们已知的打包器来测试它。
+- 我们不是通过简单查看库的配置文件，而是通过检查其构建的产物来检测摇树优化的支持程度。
+
+希望本文可以帮助各位开发者写出具备更高质量的库。
+
+关于本文  
+译者：@hypocrite  
+译文：https://zhuanlan.zhihu.com/p/594124786  
+作者：@Theodo  
+原文：https://blog.theodo.com/2021/04/library-tree-shaking/
