@@ -55,7 +55,7 @@ export default function TOCInline({
     <>
       {asDisclosure ? (
         <details open>
-          <summary className="pt-2 pb-2 ml-6 text-xl font-bold">Table of Contents</summary>
+          <summary className="ml-6 pb-2 pt-2 text-xl font-bold">Table of Contents</summary>
           <div className="ml-6">{tocList}</div>
         </details>
       ) : (

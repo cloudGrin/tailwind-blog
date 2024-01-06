@@ -5,7 +5,7 @@ import { allBlogs } from 'contentlayer/generated'
 import type { Blog } from 'contentlayer/generated'
 import type { Metadata } from 'next'
 
-export const POSTS_PER_PAGE = 4
+const POSTS_PER_PAGE = 4
 
 export const metadata: Metadata = {
   title: `Blog - ${siteMetadata.author}`,

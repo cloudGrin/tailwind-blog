@@ -29,7 +29,7 @@ export default function App({ children }: React.PropsWithChildren) {
           crossOrigin="anonymous"
         />
       </head>
-      <body className="antialiased text-black bg-white dark:bg-gray-900 dark:text-white">
+      <body className="bg-white text-black antialiased dark:bg-gray-900 dark:text-white">
         <Providers>
           <LayoutWrapper>{children}</LayoutWrapper>
         </Providers>

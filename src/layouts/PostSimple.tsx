@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import GiscusComponent from '@/components/GiscusComponent'
 import { CoreContent } from '@/utils/contentlayer'
-import type { Blog, Authors, Syndication, Snippet } from 'contentlayer/generated'
+import type { Blog, Syndication, Snippet } from 'contentlayer/generated'
 import Link from '@/components/Link'
 import PageTitle from '@/components/PageTitle'
 import SectionContainer from '@/components/SectionContainer'
@@ -21,7 +21,7 @@ const editUrl = (path) => `${siteMetadata.siteRepo}/blob/master/src/data/${path}
 
 export default function PostSimple(props: LayoutProps) {
   const { content, children } = props
-  const { filePath, path, slug, date, title, tags, readingTime, type } = content
+  const { filePath, path, date, title, tags, readingTime, type } = content
   // @ts-ignore
   const { isEdit: isSyndicationEdit } = content
 
@@ -56,10 +56,10 @@ export default function PostSimple(props: LayoutProps) {
           </header>
           <div className="" style={{ gridTemplateRows: 'auto 1fr' }}>
             <div className="xl:col-span-3 xl:row-span-2 xl:pb-0">
-              <div className="pb-8 prose prose-base max-w-none dark:prose-dark md:prose-lg">
+              <div className="prose prose-base max-w-none pb-8 dark:prose-dark md:prose-lg">
                 {children}
               </div>
-              <div className="pt-6 pb-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="border-t border-gray-200 pb-6 pt-6 dark:border-gray-700">
                 <div className="text-sm text-gray-700 dark:text-gray-300">
                   <Link href={editUrl(filePath)}>View on GitHub</Link>
                 </div>

@@ -7,12 +7,12 @@ import ThemeSwitch from './ThemeSwitch'
 
 const Header = () => {
   return (
-    <header className="flex items-center justify-between h-12">
+    <header className="flex h-12 items-center justify-between">
       <div>
         <Link href="/" aria-label={siteMetadata.headerTitle}>
           <div className="flex items-center justify-between">
             <div className="mr-3">
-              <Logo className="w-8 h-8 sm:w-6 sm:h-6" />
+              <Logo className="h-8 w-8 sm:h-6 sm:w-6" />
             </div>
             {typeof siteMetadata.headerTitle === 'string' ? (
               <div className="hidden h-6 text-base font-semibold sm:block">

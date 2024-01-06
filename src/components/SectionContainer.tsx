@@ -4,7 +4,7 @@ export default function SectionContainer({
 }: React.PropsWithChildren<{ className?: string }>) {
   return (
     <section
-      className={`w-full md:w-[48rem] px-4 mx-auto sm:px-6 xl:w-[64rem] xl:px-0 ${className ?? ''}`}
+      className={`mx-auto w-full px-4 sm:px-6 md:w-[48rem] xl:w-[64rem] xl:px-0 ${className ?? ''}`}
     >
       {children}
     </section>

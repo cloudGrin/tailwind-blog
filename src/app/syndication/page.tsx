@@ -5,7 +5,7 @@ import { allSyndications } from 'contentlayer/generated'
 import type { Syndication } from 'contentlayer/generated'
 import type { Metadata } from 'next'
 
-export const POSTS_PER_PAGE = 5
+const POSTS_PER_PAGE = 5
 
 export const metadata: Metadata = {
   title: `Syndications - ${siteMetadata.author}`,

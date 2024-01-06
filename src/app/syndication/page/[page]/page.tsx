@@ -4,7 +4,8 @@ import { allCoreContent, sortedBlogPost } from '@/utils/contentlayer'
 import type { Syndication } from 'contentlayer/generated'
 import { allSyndications } from 'contentlayer/generated'
 import { Metadata } from 'next'
-import { POSTS_PER_PAGE } from '../../page'
+
+const POSTS_PER_PAGE = 5
 
 export async function generateStaticParams() {
   const totalPosts = allSyndications
