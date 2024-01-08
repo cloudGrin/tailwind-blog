@@ -1,9 +1,7 @@
-import siteMetadata from '@/data/siteMetadata'
 import ListLayout from '@/layouts/ListLayout'
 import { allCoreContent, sortedBlogPost } from '@/utils/contentlayer'
 import type { Syndication } from 'contentlayer/generated'
 import { allSyndications } from 'contentlayer/generated'
-import { Metadata } from 'next'
 
 const POSTS_PER_PAGE = 5
 
@@ -13,11 +11,6 @@ export async function generateStaticParams() {
   return Array.from({ length: totalPages }, (_, i) => ({
     page: (i + 1).toString(),
   }))
-}
-
-export const metadata: Metadata = {
-  title: siteMetadata.author,
-  description: siteMetadata.description,
 }
 
 const getPosts = (page) => {

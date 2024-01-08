@@ -1,16 +1,12 @@
-import siteMetadata from '@/data/siteMetadata'
 import ListLayout from '@/layouts/ListLayout'
 import { sortedBlogPost, allCoreContent } from '@/utils/contentlayer'
 import { allSyndications } from 'contentlayer/generated'
 import type { Syndication } from 'contentlayer/generated'
-import type { Metadata } from 'next'
+import { genPageMetadata } from '@/app/seo'
 
 const POSTS_PER_PAGE = 5
 
-export const metadata: Metadata = {
-  title: `Syndications - ${siteMetadata.author}`,
-  description: siteMetadata.description,
-}
+export const metadata = genPageMetadata({ title: 'Syndications' })
 
 const getPosts = () => {
   const posts = sortedBlogPost(allSyndications) as Syndication[]

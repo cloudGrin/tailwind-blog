@@ -1,16 +1,12 @@
 import Link from '@/components/Link'
 import Tag from '@/components/Tag'
-import siteMetadata from '@/data/siteMetadata'
 import { getAllTags } from '@/utils/contentlayer'
 import { kebabCase } from '@/utils/kebabCase'
 import { allBlogs, allSnippets, allSyndications } from 'contentlayer/generated'
 
-import type { Metadata } from 'next'
+import { genPageMetadata } from '@/app/seo'
 
-export const metadata: Metadata = {
-  title: `Tags - ${siteMetadata.author}`,
-  description: 'Things I blog about',
-}
+export const metadata = genPageMetadata({ title: 'Tags', description: 'Things I blog about' })
 
 const getTags = () => {
   const tags = getAllTags([...allBlogs, ...allSnippets, ...allSyndications])

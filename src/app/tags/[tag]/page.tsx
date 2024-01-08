@@ -1,8 +1,10 @@
+import { genPageMetadata } from '@/app/seo'
 import siteMetadata from '@/data/siteMetadata'
 import ListLayout from '@/layouts/ListLayout'
 import { allCoreContent, getAllTags, type CoreContent } from '@/utils/contentlayer'
 import { kebabCase } from '@/utils/kebabCase'
 import { Blog, allBlogs, allSnippets, allSyndications } from 'contentlayer/generated'
+import { Metadata } from 'next'
 
 interface TagsProps {
   params: { tag: string }
@@ -16,11 +18,18 @@ export async function generateStaticParams() {
   }))
 }
 
-export async function generateMetadata({ params: { tag } }: TagsProps) {
-  return {
-    title: `${tag} - ${siteMetadata.title}`,
-    description: `${tag} tags - ${siteMetadata.author}`,
-  }
+export async function generateMetadata({ params }: { params: { tag: string } }): Promise<Metadata> {
+  const tag = decodeURI(params.tag)
+  return genPageMetadata({
+    title: tag,
+    description: `${siteMetadata.title} ${tag} tagged content`,
+    alternates: {
+      canonical: './',
+      types: {
+        'application/rss+xml': `${siteMetadata.siteUrl}/tags/${tag}/feed.xml`,
+      },
+    },
+  })
 }
 
 const getTags = (tag: string) => {

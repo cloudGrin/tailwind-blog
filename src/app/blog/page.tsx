@@ -1,16 +1,12 @@
-import siteMetadata from '@/data/siteMetadata'
 import ListLayout from '@/layouts/ListLayout'
 import { sortedBlogPost, allCoreContent } from '@/utils/contentlayer'
 import { allBlogs } from 'contentlayer/generated'
 import type { Blog } from 'contentlayer/generated'
-import type { Metadata } from 'next'
+import { genPageMetadata } from '@/app/seo'
 
 const POSTS_PER_PAGE = 4
 
-export const metadata: Metadata = {
-  title: `Blog - ${siteMetadata.author}`,
-  description: siteMetadata.description,
-}
+export const metadata = genPageMetadata({ title: 'Blog' })
 
 const getPosts = () => {
   const posts = sortedBlogPost(allBlogs) as Blog[]

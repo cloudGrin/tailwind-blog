@@ -1,7 +1,6 @@
 import Mdx from '@/components/mdx-components'
 import PageTitle from '@/components/PageTitle'
 import { allSyndications } from 'contentlayer/generated'
-import type { Syndication } from 'contentlayer/generated'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import Script from 'next/script'
@@ -26,54 +25,48 @@ async function getPageFromParams(params: PageProps['params']) {
   return page
 }
 
-// 生成符合schema.org结构化数据的函数
-function generateSchemaObjStr(post: Syndication) {
-  const { title, summary, date, lastmod, path } = post
-
-  const publishedAt = new Date(date).toISOString()
-  const modifiedAt = new Date(lastmod || date).toISOString()
-
-  const authorList = {
-    '@type': 'Person',
-    name: siteMetadata.author,
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string[] }
+}): Promise<Metadata | undefined> {
+  const post = await getPageFromParams(params)
+  if (!post) {
+    return
   }
 
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    mainEntityOfPage: {
-      '@type': 'WebPage',
-      '@id': `${siteMetadata.siteUrl}/${path}`,
-    },
-    headline: title,
-    datePublished: publishedAt,
-    dateModified: modifiedAt,
-    author: authorList,
-    publisher: {
-      '@type': 'Organization',
-      name: siteMetadata.author,
-      logo: {
-        '@type': 'ImageObject',
-        url: `${siteMetadata.siteUrl}${siteMetadata.siteLogo}`,
-      },
-    },
-    description: summary,
+  const publishedAt = new Date(post.date).toISOString()
+  const modifiedAt = new Date(post.lastmod || post.date).toISOString()
+  let imageList = [siteMetadata.socialBanner]
+  if (post.images) {
+    imageList = typeof post.images === 'string' ? [post.images] : post.images
   }
-  return JSON.stringify(structuredData, null, 2)
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const page = await getPageFromParams(params)
-
-  if (!page) {
-    return {}
-  }
-
-  const { title, summary } = page
+  const ogImages = imageList.map((img) => {
+    return {
+      url: img.includes('http') ? img : siteMetadata.siteUrl + img,
+    }
+  })
 
   return {
-    title: title,
-    description: summary,
+    title: post.title,
+    description: post.summary,
+    openGraph: {
+      title: post.title,
+      description: post.summary,
+      siteName: siteMetadata.title,
+      locale: 'en_US',
+      type: 'article',
+      publishedTime: publishedAt,
+      modifiedTime: modifiedAt,
+      url: './',
+      images: ogImages,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.summary,
+      images: imageList,
+    },
   }
 }
 
@@ -90,7 +83,11 @@ export default async function BlogPostPage({ params }: PageProps) {
     notFound()
   }
 
-  const structuredData = generateSchemaObjStr(post)
+  const jsonLd = post.structuredData
+  jsonLd['author'] = {
+    '@type': 'Person',
+    name: siteMetadata.author,
+  }
 
   return (
     <>
@@ -110,7 +107,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             id="schema-org"
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: structuredData,
+              __html: jsonLd,
             }}
           />
         </>
