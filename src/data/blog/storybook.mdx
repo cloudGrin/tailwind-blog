@@ -1,0 +1,143 @@
+---
+title: 在 NextJs 中使用 Storybook 解决 Less 接入实现 Antd 主题覆盖和 导入SVG 组件问题
+date: '2024-01-09'
+tags: ['NextJs', 'Storybook']
+draft: false
+summary: 在 NextJs 中使用 Storybook 解决 Less 接入实现 Antd 主题覆盖和 导入SVG 组件问题
+---
+
+
+<img src="https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-imgstorybook-demo.jpeg" width="800px" alt="storybook-demo" style={{height: '300px',width: '100%',objectFit: 'cover'}}/>
+
+**简介：**
+我在最近的Next.js项目中集成了 Storybook用来做组件文档和交互性测试，过程中遇到的两个问题。
+
+### 问题一：通过 Less 接入实现 Antd 主题覆盖
+在项目中，由于antd@4 使用了 Less 作为 CSS 预处理器，覆盖主题需要通过 less 变量，然而，Storybook 默认不支持 Less 和 变量的导入。为了解决这个问题，我采取了以下步骤：
+
+1. 安装 `@storybook/addon-styling-webpack` 插件。
+2. 配置 `.storybook/main.ts` 文件：在该文件中，将 `@storybook/addon-styling-webpack` 插件添加到 `addons` 数组中，通过 additionalData 在所有 less 文件头部 注入变量。
+
+```typescript
+// .storybook/main.ts
+addons: [
+    // ... other plugins
+    "@storybook/addon-interactions",
+    {
+      name: "@storybook/addon-styling-webpack",
+      options: {
+        rules: [
+          {
+            test: /\.css$/,
+            sideEffects: true,
+            use: [
+              require.resolve("style-loader"),
+              {
+                loader: require.resolve("css-loader"),
+                options: {
+                  importLoaders: 1,
+                },
+              },
+              {
+                loader: require.resolve("postcss-loader"),
+                options: {
+                  implementation: require.resolve("postcss"),
+                },
+              },
+            ],
+          },
+          {
+            test: /\.less$/,
+            sideEffects: true,
+            use: [
+              require.resolve("style-loader"),
+              {
+                loader: require.resolve("css-loader"),
+                options: {
+                  importLoaders: 1,
+                },
+              },
+              {
+                loader: require.resolve("postcss-loader"),
+                options: {
+                  implementation: require.resolve("postcss"),
+                },
+              },
+              {
+                loader: require.resolve("less-loader"),
+                options: {
+                  lessOptions: {
+                    javascriptEnabled: true,
+                  },
+                  additionalData: (/** @type {any} */ content) => {
+                    return `${content}\n\n@import '${path.resolve('./antd-custom.less')}';`
+                  }
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+```
+
+```less
+// antd-custom.less
+@import '~antd/lib/style/themes/default.less';
+@import './var.less';
+/**  用于覆盖上面定义的变量 */
+
+/**  全局主色 */
+@primary-color: @c_primary;
+
+```
+3. less变量通过 less-vars-to-js 库，转成配置在tailwind配置中共享。
+```javascript
+// tailwind.config.js
+const lessToJs = require('less-vars-to-js')
+const fs = require('fs')
+const path = require('path')
+
+const paletteLess = fs.readFileSync(path.resolve(__dirname, './var.less'), 'utf8')
+const palette = lessToJs(paletteLess, { resolveVariables: true, stripPrefix: true })
+```
+
+4. 在 `.storybook/preview.ts` 文件中导入 `antd/dist/antd.less`实现主题覆盖
+
+### 问题二：SVG 组件问题
+在项目中，我使用了 SVG 图标组件，并希望能够在 Storybook 中正确地显示它们。以下是我解决这个问题的步骤：
+
+1. 安装 `@svgr/webpack` 依赖。
+2. 配置 `.storybook/main.js` 文件，通过 webpackFinal 字段添加webpack对 svg 的处理，以启用 SVG 支持。
+
+```typescript
+webpackFinal: async (config) => {
+  const imageRule = config.module?.rules?.find(rule => {
+    const test = (rule as { test: RegExp }).test
+
+    if (!test) {
+      return false
+    }
+
+    return test.test('.svg')
+  }) as { [key: string]: any }
+
+  imageRule.exclude = /\.svg$/
+
+  config.module?.rules?.push({
+    test: /\.svg$/,
+    use: ['@svgr/webpack']
+  })
+  return config;
+}
+```
+
+### 效果
+
+![接入示例](https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-imgstorybook-demo.gif)
+
+接入Demo分享到了github， [详情查看链接](https://github.com/cloudGrin/storybook-nextjs-demo)
+
+**总结：**
+如果你也在使用这些技术栈，可以尝试一下集成 Storybook，它将为你的迭代开发和团队协作过程带来很多便利和效率提升。
