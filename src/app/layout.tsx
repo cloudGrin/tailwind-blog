@@ -57,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <meta name="msapplication-TileColor" content="#000000" />
       <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fff" />
       <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000" />
+      <meta name="google-site-verification" content="wrA5gI6PzcF5MsUBtYCMJXilZX4IxKgiEzchF9yLJIM" />
       <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
       <link
         rel="stylesheet"
