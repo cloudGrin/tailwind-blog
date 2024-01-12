@@ -1,16 +1,17 @@
 ---
-title: 在 NextJs 中使用 Storybook 解决 Less 接入实现 Antd 主题覆盖和 导入SVG 组件问题
+title: 在 NextJs 中使用 Storybook
 date: '2024-01-09'
+lastmod: '2024-01-12'
 tags: ['NextJs', 'Storybook']
 draft: false
-summary: 在 NextJs 中使用 Storybook 解决 Less 接入实现 Antd 主题覆盖和 导入SVG 组件问题
+summary: 在 NextJs 中使用 Storybook
 ---
 
 
 <img src="https://cloudgrin.oss-cn-shanghai.aliyuncs.com/images/blog-imgstorybook-demo.jpeg" width="800px" alt="storybook-demo" style={{height: '300px',width: '100%',objectFit: 'cover'}}/>
 
 **简介：**
-我在最近的Next.js项目中集成了 Storybook用来做组件文档和交互性测试，过程中遇到的两个问题。
+我在最近的Next.js项目中集成了 Storybook用来做组件文档和交互性测试，本文主要是介绍接入过程中遇到的两个问题。Storybook的使用可以按照官网文档步骤进行，也可以访问以下Demo[源码](https://github.com/cloudGrin/storybook-nextjs-demo)参照修改。
 
 ### 问题一：通过 Less 接入实现 Antd 主题覆盖
 在项目中，由于antd@4 使用了 Less 作为 CSS 预处理器，覆盖主题需要通过 less 变量，然而，Storybook 默认不支持 Less 和 变量的导入。为了解决这个问题，我采取了以下步骤：

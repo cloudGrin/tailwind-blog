@@ -4,7 +4,7 @@ import { allBlogs } from 'contentlayer/generated'
 import type { Blog } from 'contentlayer/generated'
 import { genPageMetadata } from '@/app/seo'
 
-const POSTS_PER_PAGE = 4
+const POSTS_PER_PAGE = 6
 
 export const metadata = genPageMetadata({ title: 'Blog' })
 

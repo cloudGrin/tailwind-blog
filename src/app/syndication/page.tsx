@@ -4,7 +4,7 @@ import { allSyndications } from 'contentlayer/generated'
 import type { Syndication } from 'contentlayer/generated'
 import { genPageMetadata } from '@/app/seo'
 
-const POSTS_PER_PAGE = 5
+const POSTS_PER_PAGE = 6
 
 export const metadata = genPageMetadata({ title: 'Syndications' })
 

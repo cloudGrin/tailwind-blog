@@ -1,5 +1,6 @@
 import '@/css/prism.css'
 import '@/css/tailwind.css'
+import '@/css/twemoji-amazing.css'
 import Script from 'next/script'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import siteMetadata from '@/data/siteMetadata'
@@ -59,11 +60,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000" />
       <meta name="google-site-verification" content="wrA5gI6PzcF5MsUBtYCMJXilZX4IxKgiEzchF9yLJIM" />
       <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
-      <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/gh/SebastianAigner/twemoji-amazing/twemoji-amazing.css"
-        crossOrigin="anonymous"
-      />
       <body className="bg-white text-black antialiased dark:bg-gray-900 dark:text-white">
         <Providers>
           <LayoutWrapper>{children}</LayoutWrapper>

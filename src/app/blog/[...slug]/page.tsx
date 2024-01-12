@@ -107,7 +107,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             id="schema-org"
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: jsonLd,
+              __html: JSON.stringify(jsonLd),
             }}
           />
         </>
